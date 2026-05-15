@@ -1,0 +1,10 @@
+.env
+credentials.json
+chroma_db/
+conversations.db
+__pycache__/
+*.pyc
+node_modules/
+dist/
+.venv/
+venv/
