@@ -1,6 +1,10 @@
 import { useState, useRef, useEffect } from "react";
+import AdminPanel from "./AdminPanel";
+import Home from "./Home";
+import ReactMarkdown from "react-markdown";
+import Voice from "./Voice";
 
-const API = "http://localhost:8000";
+const API = "https://api.lucchese.app";
 
 function Message({ role, content, isLatest, exchange, onFeedback }) {
   const isUser = role === "user";
@@ -44,10 +48,11 @@ function Message({ role, content, isLatest, exchange, onFeedback }) {
           fontSize: "0.92rem",
           lineHeight: 1.7,
           fontFamily: "'DM Sans', sans-serif",
-          whiteSpace: "pre-wrap",
           wordBreak: "break-word",
         }}>
-          {content}
+          <div className="message-content">
+            <ReactMarkdown>{content}</ReactMarkdown>
+          </div>
         </div>
         {!isUser && isLatest && (
           <div style={{ display: "flex", gap: 6, marginTop: 6, paddingLeft: 4 }}>
@@ -282,12 +287,18 @@ function DocumentsPanel({ onClose }) {
 }
 
 export default function App() {
+  const path = window.location.pathname;
+  
+  if (path === "/admin") return <AdminPanel />;
+  if (path === "/" || path === "/home") return <Home />;
+  if (path === "/voice") return <Voice />;
+
   const [conversations, setConversations] = useState([]);
   const [activeId, setActiveId]           = useState(null);
   const [messages, setMessages]           = useState([]);
   const [input, setInput]                 = useState("");
   const [loading, setLoading]             = useState(false);
-  const [sidebarOpen, setSidebarOpen]     = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);
   const [showDocs, setShowDocs]           = useState(false);
   const [lastExchange, setLastExchange] = useState(null);
   const [voiceMode, setVoiceMode]     = useState(false);
@@ -350,9 +361,37 @@ export default function App() {
       let buffer = "";
       let fullReply = "";
       let metaReceived = false;
+      let bubbleAdded = false;
+      // ── TTS streaming vars ──
+      let ttsBuffer = "";
+      const ttsQueue = [];
+      let ttsPlaying = false;
 
-      // Add empty assistant message to stream into
-      setMessages(prev => [...prev, { role: "assistant", content: "" }]);
+      const drainTTSQueue = async () => {
+        if (ttsPlaying) return;
+        ttsPlaying = true;
+        while (ttsQueue.length > 0) {
+          await playAudio(ttsQueue.shift());
+        }
+        ttsPlaying = false;
+      };
+
+      const flushTTSSentence = (force = false) => {
+        const sentenceEnd = /[.!?]\s/g;
+        let match;
+        let lastIndex = 0;
+        while ((match = sentenceEnd.exec(ttsBuffer)) !== null) {
+          const sentence = ttsBuffer.slice(lastIndex, match.index + 1).trim();
+          if (sentence) ttsQueue.push(sentence);
+          lastIndex = match.index + 2;
+        }
+        if (lastIndex > 0) ttsBuffer = ttsBuffer.slice(lastIndex);
+        if (force && ttsBuffer.trim()) {
+          ttsQueue.push(ttsBuffer.trim());
+          ttsBuffer = "";
+        }
+        if (voiceMode) drainTTSQueue();
+      };
 
       while (true) {
         const { done, value } = await reader.read();
@@ -360,7 +399,7 @@ export default function App() {
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
-        buffer = lines.pop(); // keep incomplete line in buffer
+        buffer = lines.pop();
 
         for (const line of lines) {
           if (!line.trim()) continue;
@@ -368,13 +407,18 @@ export default function App() {
             const chunk = JSON.parse(line);
 
             if (chunk.type === "meta") {
+              console.log("meta received, bubbleAdded:", bubbleAdded, "messages length:", messages.length);
               if (!activeId) setActiveId(chunk.conversation_id);
-              metaReceived = true;
+              if (!bubbleAdded) {
+                setMessages(prev => [...prev, { role: "assistant", content: "" }]);
+                bubbleAdded = true;
+              }
             }
 
             if (chunk.type === "token") {
               fullReply += chunk.content;
-              // Update the last message in place
+              ttsBuffer += chunk.content;
+              flushTTSSentence();
               setMessages(prev => {
                 const updated = [...prev];
                 updated[updated.length - 1] = { role: "assistant", content: fullReply };
@@ -389,7 +433,7 @@ export default function App() {
                 assistant_reply: fullReply,
                 auto_ingested: chunk.auto_ingested,
               });
-              if (voiceMode) playAudio(fullReply);
+              flushTTSSentence(true);
               fetchConversations();
             }
           } catch (e) {
@@ -409,49 +453,72 @@ export default function App() {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
   };
 
-  const startRecording = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const mediaRecorder = new MediaRecorder(stream);
-    mediaRecorderRef.current = mediaRecorder;
-    audioChunksRef.current = [];
-
-    mediaRecorder.ondataavailable = e => {
-      if (e.data.size > 0) audioChunksRef.current.push(e.data);
-    };
-
-    mediaRecorder.onstop = async () => {
-      const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-      const arrayBuffer = await blob.arrayBuffer();
-      const audioCtx = new AudioContext({ sampleRate: 16000 });
-      let decoded;
+  const toggleRecording = async () => {
+    if (recording) {
+      mediaRecorderRef.current?.stop();
+      setRecording(false);
+    } else {
       try {
-        decoded = await audioCtx.decodeAudioData(arrayBuffer);
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mimeType = [
+          "audio/webm;codecs=opus",
+          "audio/webm",
+          "audio/mp4",
+          "audio/ogg;codecs=opus",
+          "",
+        ].find(m => m === "" || MediaRecorder.isTypeSupported(m));
+
+        const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+        mediaRecorderRef.current = mediaRecorder;
+        audioChunksRef.current = [];
+
+        mediaRecorder.ondataavailable = e => {
+          if (e.data.size > 0) audioChunksRef.current.push(e.data);
+        };
+
+        mediaRecorder.onstop = async () => {
+          const blob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType || "audio/webm" });
+          const form = new FormData();
+          const ext = mediaRecorder.mimeType?.includes("mp4") ? "mp4" : mediaRecorder.mimeType?.includes("ogg") ? "ogg" : "webm";
+          form.append("file", blob, `recording.${ext}`);
+          try {
+            const res = await fetch(`${API}/transcribe`, { method: "POST", body: form });
+            const data = await res.json();
+            if (data.text) setInput(data.text);
+          } catch (err) {
+            console.error("Transcribe error:", err);
+          }
+          stream.getTracks().forEach(t => t.stop());
+        };
+
+        mediaRecorder.start();
+        setRecording(true);
       } catch (err) {
-        console.error("decodeAudioData failed:", err);
-        return;
+        console.error("Mic error:", err);
+        alert("Microphone access denied or unavailable.");
       }
-      const wav = encodeWAV(decoded);
-      const wavBlob = new Blob([wav], { type: "audio/wav" });
-      const form = new FormData();
-      form.append("file", wavBlob, "recording.wav");
-      const res = await fetch(`${API}/transcribe`, { method: "POST", body: form });
-      const data = await res.json();
-      if (data.text) setInput(data.text);
-      stream.getTracks().forEach(t => t.stop());
-      audioCtx.close();
-    };
-
-    mediaRecorder.start();
-    setRecording(true);
+    }
   };
 
-  const stopRecording = () => {
-    mediaRecorderRef.current?.stop();
-    setRecording(false);
+  // Play audio via AudioContext (works on mobile/iOS)
+  const playAudioBlob = async (blob) => {
+    try {
+      const arrayBuffer = await blob.arrayBuffer();
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const decoded = await audioCtx.decodeAudioData(arrayBuffer);
+      const source = audioCtx.createBufferSource();
+      source.buffer = decoded;
+      source.connect(audioCtx.destination);
+      source.start(0);
+      return new Promise(resolve => { source.onended = resolve; });
+    } catch (err) {
+      console.error("Audio play error:", err);
+    }
   };
 
+  // TTS a sentence chunk
   const playAudio = async (text) => {
-    if (!voiceMode) return;
+    if (!voiceMode || !text.trim()) return;
     try {
       const res = await fetch(`${API}/tts`, {
         method: "POST",
@@ -460,11 +527,7 @@ export default function App() {
       });
       if (!res.ok) return;
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio();
-      audio.src = url;
-      await audio.play();
-      audio.onended = () => URL.revokeObjectURL(url);
+      await playAudioBlob(blob);
     } catch (err) {
       console.error("playAudio error:", err);
     }
@@ -522,6 +585,15 @@ export default function App() {
         .conv-item.active { background: #1a1a1a !important; border-left: 2px solid #c8a96e !important; }
         .del-btn { opacity: 0; transition: opacity 0.2s; }
         .conv-item:hover .del-btn { opacity: 1; }
+        .message-content p { margin-bottom: 0.5rem; }
+        .message-content p:last-child { margin-bottom: 0; }
+        .message-content strong { color: #c8a96e; }
+        .message-content ul, .message-content ol { padding-left: 1.2rem; margin-bottom: 0.5rem; }
+        .message-content li { margin-bottom: 0.3rem; }
+        .message-content h1, .message-content h2, .message-content h3 { color: #e8e0d0; margin-bottom: 0.4rem; margin-top: 0.6rem; font-family: 'Playfair Display', serif; }
+        .message-content code { background: #1a1a1a; padding: 2px 6px; border-radius: 4px; font-size: 0.85em; color: #c8a96e; }
+        .message-content { text-align: left; }
+        .message-content p { margin-bottom: 0.6rem; }
       `}</style>
 
       {showDocs && <DocumentsPanel onClose={() => setShowDocs(false)} />}
@@ -536,12 +608,14 @@ export default function App() {
             display: "flex", flexDirection: "column", flexShrink: 0,
           }}>
             <div style={{ padding: "1.2rem 1rem 0.8rem", borderBottom: "1px solid #1a1a1a" }}>
-              <p style={{
-                fontFamily: "'Playfair Display', serif", fontSize: "1rem",
-                background: "linear-gradient(135deg, #c8a96e, #e8d5a3)",
-                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-                marginBottom: "0.8rem",
-              }}>Lucchese</p>
+              <a href="/" style={{ textDecoration: "none" }}>
+                <p style={{
+                  fontFamily: "'Playfair Display', serif", fontSize: "1rem",
+                  background: "linear-gradient(135deg, #c8a96e, #e8d5a3)",
+                  WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                  marginBottom: "0.8rem",
+                }}>Lucchese</p>
+              </a>
               <button onClick={newConversation} style={{
                 width: "100%", padding: "0.55rem 0.8rem",
                 background: "#161616", border: "1px solid #2a2a2a",
@@ -637,7 +711,7 @@ export default function App() {
                 exchange={i === messages.length - 1 && m.role === "assistant" ? lastExchange : null}
               />
             ))}
-            {loading && <TypingIndicator />}
+            {loading && !(messages[messages.length - 1]?.role === "assistant") && <TypingIndicator />}
             <div ref={bottomRef} />
           </div>
 
@@ -679,12 +753,9 @@ export default function App() {
               </button>
 
               {/* Record button */}
-              <button
-                  onMouseDown={startRecording}
-                  onMouseUp={stopRecording}
-                  onTouchStart={startRecording}
-                  onTouchEnd={stopRecording}
-                  title="Hold to speak"
+             <button
+                  onClick={toggleRecording}
+                  title={recording ? "Tap to stop" : "Tap to speak"}
                   style={{
                       width: 34, height: 34, borderRadius: 9, flexShrink: 0,
                       background: recording ? "linear-gradient(135deg, #e06c75, #c0392b)" : "#1e1e1e",

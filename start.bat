@@ -5,13 +5,13 @@ echo Starting Lucchese AI Assistant...
 start "Ollama" cmd /k "ollama serve"
 
 :: Start FastAPI backend
-start "Backend" cmd /k "cd /d C:\Lucchese\backend && venv\Scripts\activate && uvicorn main:app --reload --port 8000"
+start "Backend" cmd /k "cd /d C:\Lucchese\backend && venv\Scripts\activate && uvicorn main:app --reload --host 0.0.0.0 --port 8000"
 
 :: Start Vite frontend
 start "Frontend" cmd /k "cd /d C:\Lucchese\frontend && npm run dev"
 
+:: Start tunnel
+start "Tunnel" cmd /k "cloudflared tunnel run lucchese"
+
 echo All services started!
-echo   Ollama:   http://localhost:11434
-echo   Backend:  http://localhost:8000
-echo   Frontend: http://localhost:5173
 pause
