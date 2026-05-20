@@ -1,6 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
 from pydantic import BaseModel
 from typing import Optional
 import httpx
@@ -15,13 +15,18 @@ from datetime import datetime, timezone
 import math
 from ddgs import DDGS
 from pypdf import PdfReader
-from sheets import get_menu_context, get_recipes
+from sheets import get_menu_context, get_recipes, cross_reference_ingredients
 from shopify_api import create_meal_products as _create_meal_products
 from elevenlabs.client import ElevenLabs
 import os
 import whisper
 import tempfile
 import json
+from pathlib import Path
+from docx import Document as DocxDocument
+from docx.shared import Pt, RGBColor, Inches
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+import threading
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -40,6 +45,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+DOCS_DIR = Path("./generated_docs")
+DOCS_DIR.mkdir(exist_ok=True)
+
+_doc_store: dict[str, str] = {}
+_doc_lock = threading.Lock()
+
 # ── ChromaDB setup ───────────────────────────────────────────────────────────
 CHROMA_PATH   = "./chroma_db"
 EMBED_MODEL   = "all-MiniLM-L6-v2"
@@ -57,9 +68,12 @@ col_summaries = chroma.get_or_create_collection("summaries", embedding_function=
 
 
 # ── Ollama config ────────────────────────────────────────────────────────────
-OLLAMA_URL = "http://localhost:11434/api/chat"
-MODEL_FAST = "gemma2:27b"
-MODEL_DEEP = "qwen2.5:32b"
+OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434") + "/api/chat"
+MODEL_FAST = os.getenv("MODEL_FAST", "gemma2:27b")
+MODEL_DEEP = os.getenv("MODEL_DEEP", "qwen2.5:32b")
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+CHAT_PROVIDER     = os.getenv("CHAT_PROVIDER", "ollama")
+print(f"DEBUG — Provider: {CHAT_PROVIDER}, Key set: {bool(ANTHROPIC_API_KEY)}")  # remove after testing
 
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
 ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID")
@@ -113,6 +127,155 @@ def init_db():
     con.close()
 
 init_db()
+
+def _add_inline_formatting(para, text: str):
+    """Handle **bold** and *italic* inline markdown within a paragraph."""
+    pattern = re.compile(r"(\*\*.*?\*\*|\*.*?\*)")
+    parts   = pattern.split(text)
+    for part in parts:
+        if part.startswith("**") and part.endswith("**"):
+            run      = para.add_run(part[2:-2])
+            run.bold = True
+        elif part.startswith("*") and part.endswith("*"):
+            run        = para.add_run(part[1:-1])
+            run.italic = True
+        else:
+            para.add_run(part)
+
+
+def _looks_like_section_header(line: str) -> bool:
+    """
+    Detect plain-text section headers like "Property Basics:" or "Exit Strategy:"
+    when the model doesn't use markdown heading syntax.
+    Rules: ends with colon, 1-5 words, no sentence punctuation, starts with capital.
+    """
+    s = line.strip()
+    if not s.endswith(":"):
+        return False
+    if len(s) > 50:
+        return False
+    if not s[0].isupper():
+        return False
+    # 1-5 words only — section names, not sentences
+    word_count = len(s.rstrip(":").split())
+    if word_count > 5:
+        return False
+    # No sentence punctuation inside (rules out "Let's break this down:")
+    if re.search(r"[,\.!?']", s.rstrip(":")):
+        return False
+    return True
+
+
+def markdown_to_docx(content: str, title: str) -> str:
+    """
+    Convert markdown-ish text to a .docx file.
+    Handles: # ## ### headings, plain "Section:" headers, - bullets,
+    1. numbered lists, **bold**, *italic*, --- rules.
+    Returns the filepath of the saved document.
+    """
+    doc = DocxDocument()
+
+    # ── Page margins ──────────────────────────────────────────────────────────
+    for section in doc.sections:
+        section.top_margin    = Inches(1)
+        section.bottom_margin = Inches(1)
+        section.left_margin   = Inches(1.2)
+        section.right_margin  = Inches(1.2)
+
+    # ── Title ─────────────────────────────────────────────────────────────────
+    title_para = doc.add_paragraph()
+    title_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    run = title_para.add_run(title.replace("_", " ").title())
+    run.bold = True
+    run.font.size = Pt(20)
+    run.font.color.rgb = RGBColor(0x1a, 0x1a, 0x2e)
+
+    date_para = doc.add_paragraph()
+    date_run  = date_para.add_run(
+        datetime.now(timezone.utc).strftime("Generated %d %B %Y")
+    )
+    date_run.font.size = Pt(9)
+    date_run.font.color.rgb = RGBColor(0x88, 0x88, 0x88)
+    doc.add_paragraph()  # spacer
+
+    # ── Body ──────────────────────────────────────────────────────────────────
+    for line in content.split("\n"):
+        s = line.strip()
+
+        if not s:
+            doc.add_paragraph()
+            continue
+
+        # H1: # Heading
+        if s.startswith("# "):
+            p   = doc.add_paragraph()
+            run = p.add_run(s[2:].strip())
+            run.bold = True
+            run.font.size = Pt(15)
+            run.font.color.rgb = RGBColor(0x1a, 0x1a, 0x2e)
+            p.paragraph_format.space_before = Pt(14)
+            p.paragraph_format.space_after  = Pt(4)
+
+        # H2: ## Heading
+        elif s.startswith("## "):
+            p   = doc.add_paragraph()
+            run = p.add_run(s[3:].strip())
+            run.bold = True
+            run.font.size = Pt(13)
+            run.font.color.rgb = RGBColor(0x1a, 0x1a, 0x2e)
+            p.paragraph_format.space_before = Pt(12)
+            p.paragraph_format.space_after  = Pt(3)
+
+        # H3: ### Heading
+        elif s.startswith("### "):
+            p   = doc.add_paragraph()
+            run = p.add_run(s[4:].strip())
+            run.bold = True
+            run.font.size = Pt(11)
+            run.font.color.rgb = RGBColor(0x33, 0x33, 0x55)
+            p.paragraph_format.space_before = Pt(8)
+
+        # Plain-text section header fallback: "Section Name:"
+        elif _looks_like_section_header(s):
+            p   = doc.add_paragraph()
+            run = p.add_run(s.rstrip(":"))
+            run.bold = True
+            run.font.size = Pt(12)
+            run.font.color.rgb = RGBColor(0x1a, 0x1a, 0x2e)
+            p.paragraph_format.space_before = Pt(12)
+            p.paragraph_format.space_after  = Pt(3)
+
+        # Bullet: - item or * item
+        elif s.startswith(("- ", "* ")):
+            p = doc.add_paragraph(style="List Bullet")
+            _add_inline_formatting(p, s[2:].strip())
+
+        # Numbered: 1. item
+        elif re.match(r"^\d+\.\s", s):
+            p = doc.add_paragraph(style="List Number")
+            _add_inline_formatting(p, re.sub(r"^\d+\.\s*", "", s))
+
+        # Horizontal rule
+        elif s in ("---", "***", "___"):
+            p   = doc.add_paragraph()
+            run = p.add_run("─" * 60)
+            run.font.color.rgb = RGBColor(0xcc, 0xcc, 0xcc)
+            run.font.size = Pt(8)
+
+        # Normal paragraph
+        else:
+            p = doc.add_paragraph()
+            _add_inline_formatting(p, s)
+            p.paragraph_format.space_after = Pt(4)
+
+    # ── Save ──────────────────────────────────────────────────────────────────
+    safe_name = re.sub(r"[^\w\-]", "_", title)[:60]
+    filename  = f"{safe_name}_{uuid.uuid4().hex[:6]}.docx"
+    filepath  = DOCS_DIR / filename
+    doc.save(str(filepath))
+    return str(filepath)
+
+
 
 # ── DB helpers ────────────────────────────────────────────────────────────────
 def get_con():
@@ -629,16 +792,44 @@ def search_memory(query: str, n=5) -> str:
 
 # ── System prompt ─────────────────────────────────────────────────────────────
 def build_system_prompt(memory_context: str, web_context: str, sheets_context: str = "") -> str:
-    base = """You are Lucchese, a personal AI assistant for Alex Hammond.
-Alex runs PTPreps — a meal prep business based in the UK that sells high protein prepared meals in standard and bulking portions, available as one-time purchases or subscriptions via Shopify. Meals rotate regularly and are listed on the Google Sheets data you have access to.
-Alex is also a personal trainer, into bodybuilding and martial arts, and is building this AI tool to automate his business operations.
-Be direct, smart, and conversational. Match Alex's tone.
+    base = """You are Lucchese, the personal AI of Alex Hammond.
+
+Alex runs PTPreps — a meal prep business in the UK selling high protein meals in standard and bulking portions, available as one-time purchases or subscriptions via Shopify.
+Alex is a personal trainer, into bodybuilding and martial arts, and is building this AI to automate his business and act as his most knowledgeable ally.
+
+You know Alex well. Speak to him like a straight-talking, highly knowledgeable friend — not an assistant trying to please him.
+
+Be direct and assertive. State things confidently without hedging.
+Never use phrases like "it seems", "perhaps", "you might want to", "it could be", "I think", or "possibly" — if you know something, say it. If you don't, say so plainly.
+Don't soften opinions or pad answers with disclaimers.
+Don't be sycophantic — never open with praise or affirmations like "great question" or "absolutely".
+When Alex is wrong or off track, say so directly and explain why. Challenge ideas that deserve to be challenged.
+Match Alex's tone — casual, direct, no fluff.
 Don't repeat yourself or over-explain.
 Always end your response with a short, relevant question to keep the conversation moving.
 Never guess or fabricate information about PTPreps, recipes, or macros — only use the Google Sheets data provided. If something isn't in the data, say so.
 If you don't know something current like sports results, news, or prices — say so honestly.
 When you use web search results, cite them naturally.
-For ANY question about meals, ingredients, macros, or allergens — ONLY use the Google Sheets data provided. If a meal is not in the Sheets data, say "I don't have that meal in our current menu." """
+For ANY question about meals, ingredients, macros, or allergens — ONLY use the Google Sheets data provided. If a meal is not in the Sheets data, say "I don't have that meal in our current menu."
+DOCUMENT GENERATION:
+When the user asks you to write something as a document, Word doc, plan, programme, report,
+or anything they'd want to save and use offline — generate the FULL content using proper
+markdown structure. You MUST use markdown heading syntax:
+  # Main Title
+  ## Section Heading
+  ### Subsection
+  - bullet points for lists
+  **bold** for key terms
+  1. numbered steps where order matters
+
+Then end your reply with exactly this marker on its own line:
+[GENERATE_DOC: <short_descriptive_filename_no_extension>]
+Example: [GENERATE_DOC: training_programme_week1]
+
+IMPORTANT: Always use # and ## heading syntax. Never write section names as plain text.
+Only use this marker when the content is genuinely document-worthy (structured plans,
+programmes, checklists, reports). Not for short conversational answers."""
+
 
     sections = [base]
 
@@ -1079,54 +1270,105 @@ async def chat(req: ChatRequest):
     async def stream_response():
         full_reply = []
         auto_ingest = False
-
-
-        # First chunk carries metadata so frontend knows the conversation_id
+ 
         yield json.dumps({
             "type": "meta",
             "conversation_id": conversation_id,
             "web_search_used": did_search,
         }) + "\n"
-
-        async with httpx.AsyncClient(timeout=300) as client:
-            async with client.stream("POST", OLLAMA_URL, json={
-                "model": MODEL_DEEP if req.deep else MODEL_FAST,
-                "messages": messages,
-                "stream": True,
-            }) as response:
-                async for line in response.aiter_lines():
-                    if not line.strip():
-                        continue
-                    try:
-                        chunk = json.loads(line)
-                        token = chunk.get("message", {}).get("content", "")
-                        if token:
-                            full_reply.append(token)
-                            yield json.dumps({"type": "token", "content": token}) + "\n"
-                        if chunk.get("done"):
-                            break
-                    except Exception:
-                        continue
-
-        # Done — save and run post-processing
+ 
+        try:
+            if CHAT_PROVIDER == "claude":
+                system_prompt = messages[0]["content"] if messages[0]["role"] == "system" else ""
+                chat_messages = [m for m in messages if m["role"] != "system"]
+                async with httpx.AsyncClient(timeout=300) as client:
+                    res = await client.post(
+                        "https://api.anthropic.com/v1/messages",
+                        headers={
+                            "x-api-key": ANTHROPIC_API_KEY,
+                            "anthropic-version": "2023-06-01",
+                            "content-type": "application/json",
+                        },
+                        json={
+                            "model": "claude-sonnet-4-6",
+                            "max_tokens": 4096,
+                            "system": system_prompt,
+                            "messages": chat_messages,
+                        }
+                    )
+                if res.status_code != 200:
+                    raise Exception(f"Anthropic API error {res.status_code}: {res.text[:200]}")
+                reply_text = res.json()["content"][0]["text"]
+                full_reply.append(reply_text)
+                yield json.dumps({"type": "token", "content": reply_text}) + "\n"
+ 
+            else:
+                # ── Ollama (existing behaviour, unchanged) ────────────────────
+                async with httpx.AsyncClient(timeout=300) as client:
+                    async with client.stream("POST", OLLAMA_URL, json={
+                        "model":    MODEL_DEEP if req.deep else MODEL_FAST,
+                        "messages": messages,
+                        "stream":   True,
+                    }) as response:
+                        async for line in response.aiter_lines():
+                            if not line.strip():
+                                continue
+                            try:
+                                chunk = json.loads(line)
+                                token = chunk.get("message", {}).get("content", "")
+                                if token:
+                                    full_reply.append(token)
+                                    yield json.dumps({"type": "token", "content": token}) + "\n"
+                                if chunk.get("done"):
+                                    break
+                            except Exception:
+                                continue
+ 
+        except Exception as e:
+            print(f"stream_response error ({CHAT_PROVIDER}): {e}")
+            yield json.dumps({"type": "token", "content": "\n\n[Response error — please try again]"}) + "\n"
+ 
+        # ── Post-processing (identical regardless of provider) ────────────────
         reply = "".join(full_reply)
-        save_message(conversation_id, "assistant", reply)
-
-        user_corrections = ['we already', 'actually', "that's wrong", 'not quite',
-                            'to clarify', "we don't", 'we do', 'i am', "i'm not"]
-        force_ingest = any(s in req.message.lower() for s in user_corrections)
-
-        if force_ingest:
-            auto_ingest = True
-            await ingest_exchange(conversation_id, req.message, reply)
-        elif not did_search:
-            auto_ingest = should_ingest(req.message, reply)
-            print(f"Should ingest: {auto_ingest} | Message: '{req.message[:40]}'")
-            if auto_ingest:
+        if reply:
+            save_message(conversation_id, "assistant", reply)
+ 
+            user_corrections = ['we already', 'actually', "that's wrong", 'not quite',
+                                'to clarify', "we don't", 'we do', 'i am', "i'm not"]
+            force_ingest = any(s in req.message.lower() for s in user_corrections)
+ 
+            if force_ingest:
+                auto_ingest = True
                 await ingest_exchange(conversation_id, req.message, reply)
+            elif not did_search:
+                auto_ingest = should_ingest(req.message, reply)
+                print(f"Should ingest: {auto_ingest} | Message: '{req.message[:40]}'")
+                if auto_ingest:
+                    await ingest_exchange(conversation_id, req.message, reply)
+ 
         yield json.dumps({"type": "done", "auto_ingested": auto_ingest}) + "\n"
-
     return StreamingResponse(stream_response(), media_type="application/x-ndjson")
+
+
+# ── Cross reference endpoint ──────────────────────────────────────────────
+@app.get("/cross-reference")
+def cross_reference(sheets: str = None, threshold: float = 0.8):
+    """
+    Cross-reference raw ingredients against recipe ingredients.
+    sheets: comma-separated sheet names (e.g., "Standard Recipe,Bulking Recipes"), defaults to both
+    threshold: similarity threshold 0-1 for fuzzy matching (default 0.8)
+    """
+    try:
+        if sheets:
+            sheets_list = [s.strip() for s in sheets.split(',')]
+        else:
+            sheets_list = None
+
+        result = cross_reference_ingredients(sheets_list, threshold)
+        return result
+    except Exception as e:
+        return {"error": str(e)}, 500
+
 
 # ── Shopify endpoint ──────────────────────────────────────────────────────────
 @app.post("/shopify/add-meal")
@@ -1255,6 +1497,64 @@ async def feedback(req: FeedbackRequest):
         except Exception as e:
             print(f"feedback delete error: {e}")
         return {"ingested": False}
+
+DOC_MARKER_RE = re.compile(r"\[GENERATE_DOC:\s*([^\]]+)\]", re.IGNORECASE)
+
+@app.post("/generate-doc")
+async def generate_doc(req: dict):
+    """
+    Called by the frontend when it detects a [GENERATE_DOC: ...] marker.
+    Body: { "content": "...", "title": "..." }
+    Returns: { "token": "...", "filename": "..." }
+    """
+    content = req.get("content", "").strip()
+    title   = req.get("title", "document").strip()
+
+    if not content:
+        return {"error": "No content provided"}
+
+    try:
+        filepath = markdown_to_docx(content, title)
+        token    = uuid.uuid4().hex
+        filename = Path(filepath).name
+
+        with _doc_lock:
+            _doc_store[token] = filepath
+
+        # Auto-cleanup after 15 minutes
+        async def cleanup():
+            import asyncio
+            await asyncio.sleep(900)
+            with _doc_lock:
+                path = _doc_store.pop(token, None)
+            if path and os.path.exists(path):
+                os.remove(path)
+
+        import asyncio
+        asyncio.create_task(cleanup())
+
+        return {"token": token, "filename": filename}
+
+    except Exception as e:
+        print(f"generate_doc error: {e}")
+        return {"error": str(e)}
+
+
+@app.get("/download/{token}")
+async def download_doc(token: str):
+    with _doc_lock:
+        filepath = _doc_store.get(token)
+
+    if not filepath or not os.path.exists(filepath):
+        return JSONResponse({"error": "Document not found or expired"}, status_code=404)
+
+    filename = Path(filepath).name
+    return FileResponse(
+        path        = filepath,
+        filename    = filename,
+        media_type  = "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
+
 
 # ── Shared audio transcription helper ────────────────────────────────────────
 async def transcribe_audio(file: UploadFile) -> str:

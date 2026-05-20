@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import AdminPanel from "./AdminPanel";
 import Home from "./Home";
 import ReactMarkdown from "react-markdown";
@@ -6,27 +6,135 @@ import Voice from "./Voice";
 
 const API = "https://api.lucchese.app";
 
+const DOC_MARKER = /\[GENERATE_DOC:\s*([^\]]+)\]/i;
+
+function DownloadDocButton({ content, title }) {
+  const [status, setStatus] = useState("idle"); // idle | loading | ready | error
+  const [token, setToken]   = useState(null);
+  const [filename, setFilename] = useState(null);
+
+  const generate = async () => {
+    setStatus("loading");
+    try {
+      const res  = await fetch(`${API}/generate-doc`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ content, title }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setToken(data.token);
+      setFilename(data.filename);
+      setStatus("ready");
+    } catch (e) {
+      console.error("Doc generation error:", e);
+      setStatus("error");
+    }
+  };
+
+  const download = () => {
+    window.open(`${API}/download/${token}`, "_blank");
+  };
+
+  if (status === "idle") return (
+    <button
+      onClick={generate}
+      style={{
+        display:        "flex",
+        alignItems:     "center",
+        gap:            6,
+        marginTop:      10,
+        padding:        "0.45rem 1rem",
+        borderRadius:   8,
+        background:     "linear-gradient(135deg, #c8a96e22, #c8a96e11)",
+        border:         "1px solid #c8a96e55",
+        color:          "#c8a96e",
+        fontSize:       "0.78rem",
+        fontWeight:     500,
+        cursor:         "pointer",
+        transition:     "opacity 0.2s",
+      }}
+    >
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+      </svg>
+      Save as Word Doc
+    </button>
+  );
+
+  if (status === "loading") return (
+    <div style={{ marginTop: 10, fontSize: "0.75rem", color: "#555", display: "flex", alignItems: "center", gap: 6 }}>
+      <div style={{ width: 10, height: 10, borderRadius: "50%", border: "1.5px solid #c8a96e", borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }} />
+      Generating document...
+    </div>
+  );
+
+  if (status === "error") return (
+    <div style={{ marginTop: 10, fontSize: "0.75rem", color: "#e06c75" }}>
+      ✗ Failed to generate document
+    </div>
+  );
+
+  // ready
+  return (
+    <button
+      onClick={download}
+      style={{
+        display:      "flex",
+        alignItems:   "center",
+        gap:          6,
+        marginTop:    10,
+        padding:      "0.45rem 1rem",
+        borderRadius: 8,
+        background:   "linear-gradient(135deg, #c8a96e, #8b6914)",
+        border:       "none",
+        color:        "#0a0a0a",
+        fontSize:     "0.78rem",
+        fontWeight:   600,
+        cursor:       "pointer",
+      }}
+    >
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      Download {filename}
+    </button>
+  );
+}
+
+// ── Updated Message component ─────────────────────────────────────────────────
+// Replace your existing Message function entirely with this:
+
 function Message({ role, content, isLatest, exchange, onFeedback }) {
   const isUser = role === "user";
   const [rated, setRated] = useState(null);
+
+  // Detect and strip the doc marker from the content
+  const docMatch   = content.match(DOC_MARKER);
+  const docTitle   = docMatch ? docMatch[1].trim() : null;
+  // Clean content shown to user — remove the marker line entirely
+  const cleanContent = content.replace(DOC_MARKER, "").replace(/\n{3,}/g, "\n\n").trim();
 
   const giveFeedback = async (rating) => {
     setRated(rating);
     if (exchange) {
       await fetch(`${API}/feedback`, {
-        method: "POST",
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...exchange, rating }),
+        body:    JSON.stringify({ ...exchange, rating }),
       });
     }
   };
 
   return (
     <div style={{
-      display: "flex",
+      display:       "flex",
       justifyContent: isUser ? "flex-end" : "flex-start",
-      marginBottom: "1.5rem",
-      animation: "fadeUp 0.3s ease forwards",
+      marginBottom:  "1.5rem",
+      animation:     "fadeUp 0.3s ease forwards",
     }}>
       {!isUser && (
         <div style={{
@@ -40,29 +148,36 @@ function Message({ role, content, isLatest, exchange, onFeedback }) {
       )}
       <div style={{ display: "flex", flexDirection: "column", maxWidth: "70%" }}>
         <div style={{
-          padding: "0.85rem 1.1rem",
+          padding:      "0.85rem 1.1rem",
           borderRadius: isUser ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
-          background: isUser ? "linear-gradient(135deg, #c8a96e22, #c8a96e11)" : "#141414",
-          border: isUser ? "1px solid #c8a96e44" : "1px solid #222",
-          color: "#e8e0d0",
-          fontSize: "0.92rem",
-          lineHeight: 1.7,
-          fontFamily: "'DM Sans', sans-serif",
-          wordBreak: "break-word",
+          background:   isUser ? "linear-gradient(135deg, #c8a96e22, #c8a96e11)" : "#141414",
+          border:       isUser ? "1px solid #c8a96e44" : "1px solid #222",
+          color:        "#e8e0d0",
+          fontSize:     "0.92rem",
+          lineHeight:   1.7,
+          fontFamily:   "'DM Sans', sans-serif",
+          wordBreak:    "break-word",
         }}>
           <div className="message-content">
-            <ReactMarkdown>{content}</ReactMarkdown>
+            <ReactMarkdown>{cleanContent}</ReactMarkdown>
           </div>
+
+          {/* Doc download button — shown inline inside the bubble */}
+          {!isUser && docTitle && (
+            <DownloadDocButton content={cleanContent} title={docTitle} />
+          )}
         </div>
+
+        {/* Thumbs feedback row */}
         {!isUser && isLatest && (
           <div style={{ display: "flex", gap: 6, marginTop: 6, paddingLeft: 4 }}>
             <button
               onClick={() => giveFeedback("good")}
               title="Good response — save to memory"
               style={{
-                opacity: rated ? (rated === "good" ? 1 : 0.3) : 0.4,
+                opacity:    rated ? (rated === "good" ? 1 : 0.3) : 0.4,
                 transition: "opacity 0.2s",
-                color: rated === "good" ? "#4caf7d" : "#555",
+                color:      rated === "good" ? "#4caf7d" : "#555",
               }}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill={rated === "good" ? "#4caf7d" : "none"} stroke="currentColor" strokeWidth="2">
@@ -74,9 +189,9 @@ function Message({ role, content, isLatest, exchange, onFeedback }) {
               onClick={() => giveFeedback("bad")}
               title="Bad response — remove from memory"
               style={{
-                opacity: rated ? (rated === "bad" ? 1 : 0.3) : 0.4,
+                opacity:    rated ? (rated === "bad" ? 1 : 0.3) : 0.4,
                 transition: "opacity 0.2s",
-                color: rated === "bad" ? "#e06c75" : "#555",
+                color:      rated === "bad" ? "#e06c75" : "#555",
               }}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill={rated === "bad" ? "#e06c75" : "none"} stroke="currentColor" strokeWidth="2">
@@ -93,6 +208,7 @@ function Message({ role, content, isLatest, exchange, onFeedback }) {
     </div>
   );
 }
+
 
 function TypingIndicator() {
   return (
@@ -303,6 +419,7 @@ export default function App() {
   const [lastExchange, setLastExchange] = useState(null);
   const [voiceMode, setVoiceMode]     = useState(false);
   const [recording, setRecording]     = useState(false);
+  const [audioError, setAudioError]   = useState(null);
   const mediaRecorderRef              = useRef(null);
   const audioChunksRef                = useRef([]);
   const bottomRef = useRef(null);
@@ -503,9 +620,16 @@ export default function App() {
   // Play audio via AudioContext (works on mobile/iOS)
   const playAudioBlob = async (blob) => {
     try {
+      setAudioError(null);
       const arrayBuffer = await blob.arrayBuffer();
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const decoded = await audioCtx.decodeAudioData(arrayBuffer);
+      let decoded;
+      try {
+        decoded = await audioCtx.decodeAudioData(arrayBuffer);
+      } catch (decodeErr) {
+        setAudioError("Failed to decode audio format.");
+        return;
+      }
       const source = audioCtx.createBufferSource();
       source.buffer = decoded;
       source.connect(audioCtx.destination);
@@ -513,6 +637,7 @@ export default function App() {
       return new Promise(resolve => { source.onended = resolve; });
     } catch (err) {
       console.error("Audio play error:", err);
+      setAudioError("Failed to play audio. Please check your speakers.");
     }
   };
 
@@ -520,16 +645,21 @@ export default function App() {
   const playAudio = async (text) => {
     if (!voiceMode || !text.trim()) return;
     try {
+      setAudioError(null);
       const res = await fetch(`${API}/tts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        setAudioError("TTS service unavailable.");
+        return;
+      }
       const blob = await res.blob();
       await playAudioBlob(blob);
     } catch (err) {
       console.error("playAudio error:", err);
+      setAudioError("Failed to play audio. Please try again.");
     }
   };
 
@@ -575,6 +705,7 @@ export default function App() {
         body { background: #0a0a0a; color: #e8e0d0; font-family: 'DM Sans', sans-serif; height: 100vh; overflow: hidden; }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes pulse { 0%,100% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.1); } }
+        @keyframes spin { to { transform: rotate(360deg); } }
         ::-webkit-scrollbar { width: 3px; }
         ::-webkit-scrollbar-thumb { background: #222; border-radius: 2px; }
         textarea { resize: none; outline: none; border: none; background: transparent; color: #e8e0d0; font-family: 'DM Sans', sans-serif; font-size: 0.95rem; width: 100%; line-height: 1.6; }
@@ -782,6 +913,11 @@ export default function App() {
             <p style={{ textAlign: "center", fontSize: "0.68rem", color: "#2a2a2a", marginTop: "0.6rem", letterSpacing: 1 }}>
               SHIFT+ENTER FOR NEW LINE · ENTER TO SEND
             </p>
+            {voiceMode && audioError && (
+              <p style={{ textAlign: "center", fontSize: "0.72rem", color: "#e06c75", marginTop: "0.6rem" }}>
+                ⚠ {audioError}
+              </p>
+            )}
           </div>
         </div>
       </div>

@@ -58,6 +58,149 @@ def get_recipes(sheet_name='Standard Recipe'):
         })
     return meals
 
+def cross_reference_ingredients(sheets_to_check: list[str] | None = None, similarity_threshold: float = 0.8) -> dict:
+    """
+    Compare raw ingredients against recipe ingredients.
+    Returns missing ingredients (in recipes but not in raw ingredients list).
+
+    sheets_to_check: list of recipe sheet names, defaults to ['Standard Recipe', 'Bulking Recipes']
+    similarity_threshold: how closely names must match (0-1, 1 is exact). 0.8 catches "Chicken Breast" vs "Chicken breast"
+    """
+    from difflib import SequenceMatcher
+
+    if sheets_to_check is None:
+        sheets_to_check = ['Standard Recipe', 'Bulking Recipes']
+
+    # Get raw ingredients — normalize names for comparison
+    raw_ingredients = get_ingredients()
+    raw_names = {ing['name'].lower().strip() for ing in raw_ingredients}
+
+    # Extract all unique ingredient names from recipes
+    recipe_ingredients = set()
+    for sheet_name in sheets_to_check:
+        try:
+            meals = get_recipes(sheet_name)
+            for meal in meals.values():
+                for ing in meal['ingredients']:
+                    if ing['ingredient'].strip():
+                        recipe_ingredients.add(ing['ingredient'].lower().strip())
+        except Exception as e:
+            print(f"Error fetching from {sheet_name}: {e}")
+            continue
+
+    # Find missing ingredients using fuzzy matching
+    missing = []
+    for recipe_ing in sorted(recipe_ingredients):
+        # Check if there's a close match in raw ingredients
+        best_match = max(
+            ((SequenceMatcher(None, recipe_ing, raw_name).ratio(), raw_name)
+             for raw_name in raw_names),
+            default=(0, None)
+        )
+
+        if best_match[0] < similarity_threshold:
+            missing.append({
+                'ingredient': recipe_ing,
+                'best_match': best_match[1],
+                'match_score': round(best_match[0], 2)
+            })
+
+    return {
+        'missing_count': len(missing),
+        'missing_ingredients': missing,
+        'sheets_checked': sheets_to_check,
+        'total_raw_ingredients': len(raw_names),
+        'total_recipe_ingredients': len(recipe_ingredients),
+    }
+
+
+def get_raw_prices() -> dict:
+    """Fetch raw ingredient prices from RawPrice sheet. Returns {product_name: price_data}"""
+    try:
+        result = sheet.values().get(
+            spreadsheetId=SPREADSHEET_ID,
+            range='RawPrice!A2:G500'
+        ).execute()
+        values = result.get('values', [])
+        prices = {}
+        for row in values:
+            if not row or not row[0]:
+                continue
+            product_name = row[0].lower().strip()
+            prices[product_name] = {
+                'product': row[0] if len(row) > 0 else '',
+                'supplier': row[1] if len(row) > 1 else '',
+                'price_inc_vat': row[2] if len(row) > 2 else None,
+                'notes': row[3] if len(row) > 3 else '',
+                'parsed_notes': row[4] if len(row) > 4 else '',
+                'total_kg': row[5] if len(row) > 5 else None,
+                'price_per_kg': row[6] if len(row) > 6 else None,
+            }
+        return prices
+    except Exception as e:
+        print(f"Error fetching raw prices: {e}")
+        return {}
+
+def calculate_meal_costs(sheet_names: list[str] | None = None) -> dict:
+    """Calculate total ingredient cost for each meal, tracking suppliers. Returns {meal_name: {standard_cost, bulking_cost, suppliers}}"""
+    if sheet_names is None:
+        sheet_names = ['Standard Recipe', 'Bulking Recipes']
+
+    raw_prices = get_raw_prices()
+    meal_costs = {}
+
+    for sheet_name in sheet_names:
+        try:
+            meals = get_recipes(sheet_name)
+            for meal_name, meal in meals.items():
+                cost_key = 'standard_cost' if sheet_name == 'Standard Recipe' else 'bulking_cost'
+                supplier_key = 'standard_suppliers' if sheet_name == 'Standard Recipe' else 'bulking_suppliers'
+
+                total_cost = 0
+                supplier_breakdown = {}  # {supplier: total_cost}
+                missing_prices = []
+
+                for ing in meal['ingredients']:
+                    ing_name = ing['ingredient'].lower().strip()
+                    weight_g = float(ing['weight_g'] or 0) if ing['weight_g'] else 0
+
+                    # Try to find exact or close match in raw prices
+                    matched = None
+                    for raw_name, price_data in raw_prices.items():
+                        if raw_name in ing_name or ing_name in raw_name:
+                            matched = price_data
+                            break
+
+                    if matched and matched['price_per_kg']:
+                        try:
+                            price_per_kg = float(matched['price_per_kg'])
+                            cost = (weight_g / 1000) * price_per_kg
+                            total_cost += cost
+
+                            # Track supplier breakdown
+                            supplier = matched['supplier'] or 'Unknown'
+                            supplier_breakdown[supplier] = supplier_breakdown.get(supplier, 0) + cost
+                        except:
+                            missing_prices.append(ing_name)
+                    elif weight_g > 0:
+                        missing_prices.append(ing_name)
+
+                if meal_name not in meal_costs:
+                    meal_costs[meal_name] = {}
+                meal_costs[meal_name][cost_key] = round(total_cost, 2)
+                meal_costs[meal_name][supplier_key] = {k: round(v, 2) for k, v in supplier_breakdown.items()}
+                if missing_prices:
+                    meal_costs[meal_name]['missing_prices'] = missing_prices
+        except Exception as e:
+            print(f"Error calculating costs for {sheet_name}: {e}")
+
+    return meal_costs
+
+def get_margins() -> dict:
+    """Fetch meal margins by calculating costs from RawPrice sheet."""
+    return calculate_meal_costs()
+
+
 def get_menu_context(query: str) -> str:
     query_lower = query.lower()
     context_parts = []
@@ -65,16 +208,14 @@ def get_menu_context(query: str) -> str:
     standard = get_recipes('Standard Recipe')
     bulking = get_recipes('Bulking Recipes')
 
-    # Full menu list
-    if any(w in query_lower for w in ['menu', 'meals', 'all', 'list']):
-        lines = ["Current menu:"]
-        for meal_name in standard.keys():
-            lines.append(f"  - {meal_name}")
-        context_parts.append("\n".join(lines))
-    
+    # Full menu list — ALWAYS include
+    lines = ["Current menu (all meals):"]
+    for meal_name in standard.keys():
+        lines.append(f"  - {meal_name}")
+    context_parts.append("\n".join(lines))
+
     # Comparison queries — pass all meal totals
     if any(w in query_lower for w in ['highest', 'lowest', 'most', 'least', 'best', 'compare']):
-        standard = get_recipes('Standard Recipe')
         lines = ["All meal totals (standard):"]
         for meal_name, meal in standard.items():
             total_kcal    = sum(float(i['kcal'] or 0)    for i in meal['ingredients'] if i['kcal'])
@@ -147,5 +288,46 @@ def get_menu_context(query: str) -> str:
             if i['allergens']:
                 lines.append(f"  - {i['name']}: {i['allergens']}")
         context_parts.append("\n".join(lines))
+
+    # Cross-reference raw vs recipe ingredients
+    if any(w in query_lower for w in ['missing', 'cross-reference', 'raw ingredients', 'cross reference']):
+        xref = cross_reference_ingredients()
+        lines = [f"Missing ingredients (in recipes but not in raw ingredients list):"]
+        if xref['missing_ingredients']:
+            for item in xref['missing_ingredients']:
+                lines.append(f"  - {item['ingredient']} (closest match: {item['best_match']} at {item['match_score']*100:.0f}% similarity)")
+        else:
+            lines.append("  ✓ All recipe ingredients are in the raw ingredients list")
+        lines.extend([
+            f"",
+            f"Stats: {xref['total_recipe_ingredients']} total recipe ingredients, {xref['total_raw_ingredients']} raw ingredients available"
+        ])
+        context_parts.append("\n".join(lines))
+
+    # Meal margins and pricing
+    if any(w in query_lower for w in ['margin', 'profit', 'price', 'cost', 'pricing', 'supplier']):
+        costs = get_margins()
+        if costs:
+            lines = ["Meal ingredient costs and suppliers:"]
+            for meal_name in sorted(costs.keys()):
+                c = costs[meal_name]
+                lines.append(f"  {meal_name}:")
+                if 'standard_cost' in c:
+                    lines.append(f"    Standard cost: £{c['standard_cost']:.2f}")
+                    if 'standard_suppliers' in c and c['standard_suppliers']:
+                        suppliers = c['standard_suppliers']
+                        for supplier, cost in sorted(suppliers.items(), key=lambda x: x[1], reverse=True):
+                            pct = (cost / c['standard_cost'] * 100) if c['standard_cost'] > 0 else 0
+                            lines.append(f"      • {supplier}: £{cost:.2f} ({pct:.0f}%)")
+                if 'bulking_cost' in c:
+                    lines.append(f"    Bulking cost: £{c['bulking_cost']:.2f}")
+                    if 'bulking_suppliers' in c and c['bulking_suppliers']:
+                        suppliers = c['bulking_suppliers']
+                        for supplier, cost in sorted(suppliers.items(), key=lambda x: x[1], reverse=True):
+                            pct = (cost / c['bulking_cost'] * 100) if c['bulking_cost'] > 0 else 0
+                            lines.append(f"      • {supplier}: £{cost:.2f} ({pct:.0f}%)")
+                if 'missing_prices' in c and c['missing_prices']:
+                    lines.append(f"    ⚠ No prices for: {', '.join(c['missing_prices'][:3])}")
+            context_parts.append("\n".join(lines))
 
     return "\n\n".join(context_parts)

@@ -29,6 +29,7 @@ export default function Voice() {
   const [transcript, setTranscript] = useState("");
   const [reply, setReply]           = useState("");
   const [convId, setConvId]         = useState(null);
+  const [audioError, setAudioError] = useState(null);
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef   = useRef([]);
@@ -76,6 +77,7 @@ export default function Voice() {
   // ── Recording ───────────────────────────────────────────────────────────────
   const startListening = async () => {
     try {
+      setAudioError(null);
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
@@ -107,7 +109,7 @@ export default function Voice() {
 
     } catch (err) {
       console.error("Mic error:", err);
-      alert("Microphone access denied.");
+      setAudioError("Microphone access denied. Please allow microphone permissions.");
     }
   };
 
@@ -144,6 +146,7 @@ export default function Voice() {
       setTranscript(data.transcript || "");
       setReply(data.reply || "");
       if (data.conv_id) setConvId(data.conv_id);
+      setAudioError(null);
 
       if (data.audio_b64) {
         playBase64Audio(data.audio_b64);
@@ -153,43 +156,61 @@ export default function Voice() {
 
     } catch (err) {
       console.error("Voice chat error:", err);
+      setAudioError("Network error. Please try again.");
       setState(STATE.IDLE);
     }
   };
 
-  // ── Play base64 audio ───────────────────────────────────────────────────────
-  const playBase64Audio = (b64) => {
+  // ── Play base64 audio via AudioContext (mobile-friendly) ──────────────────
+  const playBase64Audio = async (b64) => {
     setState(STATE.SPEAKING);
+    setAudioError(null);
     try {
       const binary = atob(b64);
       const bytes  = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      const blob   = new Blob([bytes], { type: "audio/mpeg" });
-      const url    = URL.createObjectURL(blob);
-      const audio  = new Audio(url);
+      const arrayBuffer = bytes.buffer;
+
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      let decoded;
+      try {
+        decoded = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
+      } catch (decodeErr) {
+        setAudioError("Failed to decode audio. Unsupported format.");
+        stopPulse();
+        setState(STATE.IDLE);
+        return;
+      }
+
+      const source = audioCtx.createBufferSource();
+      source.buffer = decoded;
+      source.connect(audioCtx.destination);
 
       startPulse();
 
-      audio.onended = () => {
+      source.onended = () => {
         stopPulse();
-        URL.revokeObjectURL(url);
         setState(STATE.IDLE);
       };
 
-      audio.onerror = () => {
+      source.onerror = () => {
+        setAudioError("Audio playback error. Please try again.");
         stopPulse();
-        URL.revokeObjectURL(url);
         setState(STATE.IDLE);
       };
 
-      audio.play().catch(err => {
-        console.error("Play error:", err);
+      try {
+        source.start(0);
+      } catch (playErr) {
+        setAudioError("Could not start audio playback. Please try again.");
         stopPulse();
         setState(STATE.IDLE);
-      });
+      }
 
     } catch (err) {
-      console.error("Base64 decode error:", err);
+      console.error("Audio error:", err);
+      setAudioError("Audio playback failed. Please try again.");
+      stopPulse();
       setState(STATE.IDLE);
     }
   };
@@ -211,6 +232,7 @@ export default function Voice() {
       display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center",
       fontFamily: "'DM Sans', sans-serif", userSelect: "none",
+      padding: "1rem",
     }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400&family=DM+Sans:wght@300;400&display=swap');
@@ -225,19 +247,19 @@ export default function Voice() {
 
       <p style={{
         position: "absolute", top: "1.5rem",
-        fontFamily: "'Playfair Display', serif", fontSize: "1rem", letterSpacing: 3,
+        fontFamily: "'Playfair Display', serif", fontSize: "clamp(0.8rem, 2vw, 1rem)", letterSpacing: 3,
         background: "linear-gradient(135deg, #c8a96e, #e8d5a3)",
         WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
       }}>LUCCHESE</p>
 
       <div style={{
-        width: 260, height: 260, borderRadius: "50%",
+        width: "clamp(200px, 60vw, 260px)", height: "clamp(200px, 60vw, 260px)", borderRadius: "50%",
         background: `radial-gradient(circle, ${glowColor}22 0%, transparent 70%)`,
         display: "flex", alignItems: "center", justifyContent: "center",
         transition: "background 0.4s ease",
       }}>
         <div onClick={handleTap} style={{
-          width: 180, height: 180, borderRadius: "50%",
+          width: "clamp(140px, 45vw, 180px)", height: "clamp(140px, 45vw, 180px)", borderRadius: "50%",
           background: `radial-gradient(circle at 35% 35%, ${c1}, ${c2})`,
           boxShadow: state !== STATE.IDLE
             ? `0 0 40px ${c1}66, 0 0 80px ${c1}22`
@@ -250,7 +272,7 @@ export default function Voice() {
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>
           {state === STATE.IDLE && (
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#c8a96e" strokeWidth="1.5">
+            <svg width="clamp(24px, 5vw, 32px)" height="clamp(24px, 5vw, 32px)" viewBox="0 0 24 24" fill="none" stroke="#c8a96e" strokeWidth="1.5">
               <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
               <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
               <line x1="12" y1="19" x2="12" y2="23"/>
@@ -261,7 +283,7 @@ export default function Voice() {
       </div>
 
       <p style={{
-        marginTop: "2rem", fontSize: "0.7rem", letterSpacing: 3,
+        marginTop: "clamp(1rem, 4vh, 2rem)", fontSize: "clamp(0.65rem, 1.5vw, 0.7rem)", letterSpacing: 3,
         color: state === STATE.IDLE ? "#333" : "#888",
         textTransform: "uppercase",
         animation: state === STATE.THINKING ? "breathe 1.2s ease infinite" : "none",
@@ -269,17 +291,24 @@ export default function Voice() {
         {LABELS[state]}
       </p>
 
+      {audioError && (
+        <p style={{
+          marginTop: "1rem", maxWidth: 280, textAlign: "center",
+          fontSize: "clamp(0.7rem, 1.5vw, 0.78rem)", color: "#e06c75", lineHeight: 1.6, padding: "0 1rem",
+        }}>⚠ {audioError}</p>
+      )}
+
       {transcript && (
         <p style={{
-          marginTop: "1.5rem", maxWidth: 280, textAlign: "center",
-          fontSize: "0.82rem", color: "#555", lineHeight: 1.6, padding: "0 1rem",
+          marginTop: "clamp(0.75rem, 2vh, 1.5rem)", maxWidth: 280, textAlign: "center",
+          fontSize: "clamp(0.75rem, 1.5vw, 0.82rem)", color: "#555", lineHeight: 1.6, padding: "0 1rem",
         }}>"{transcript}"</p>
       )}
 
       {reply && state !== STATE.THINKING && (
         <p style={{
-          marginTop: "0.75rem", maxWidth: 300, textAlign: "center",
-          fontSize: "0.78rem", color: "#888", lineHeight: 1.6, padding: "0 1rem",
+          marginTop: "clamp(0.5rem, 1vh, 0.75rem)", maxWidth: 300, textAlign: "center",
+          fontSize: "clamp(0.7rem, 1.5vw, 0.78rem)", color: "#888", lineHeight: 1.6, padding: "0 1rem",
         }}>{reply}</p>
       )}
     </div>
