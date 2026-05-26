@@ -4,9 +4,40 @@ import Home from "./Home";
 import ReactMarkdown from "react-markdown";
 import Voice from "./Voice";
 
-const API = "https://api.lucchese.app";
+const API = import.meta.env.VITE_API_URL || "https://api.lucchese.app";
 
 const DOC_MARKER = /\[GENERATE_DOC:\s*([^\]]+)\]/i;
+
+function encodeWAV(audioBuffer) {
+  const numChannels = 1;
+  const sampleRate = audioBuffer.sampleRate;
+  const samples = audioBuffer.getChannelData(0);
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buffer);
+
+  const writeStr = (offset, str) => { for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)); };
+  writeStr(0, "RIFF");
+  view.setUint32(4, 36 + samples.length * 2, true);
+  writeStr(8, "WAVE");
+  writeStr(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeStr(36, "data");
+  view.setUint32(40, samples.length * 2, true);
+
+  let offset = 44;
+  for (let i = 0; i < samples.length; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+    offset += 2;
+  }
+  return buffer;
+}
 
 function DownloadDocButton({ content, title }) {
   const [status, setStatus] = useState("idle"); // idle | loading | ready | error
@@ -402,13 +433,7 @@ function DocumentsPanel({ onClose }) {
   );
 }
 
-export default function App() {
-  const path = window.location.pathname;
-  
-  if (path === "/admin") return <AdminPanel />;
-  if (path === "/" || path === "/home") return <Home />;
-  if (path === "/voice") return <Voice />;
-
+function ChatApp() {
   const [conversations, setConversations] = useState([]);
   const [activeId, setActiveId]           = useState(null);
   const [messages, setMessages]           = useState([]);
@@ -665,38 +690,6 @@ export default function App() {
 
   const formatDate = (iso) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
-  // WAV encoder helper - add this outside the App component
-  function encodeWAV(audioBuffer) {
-    const numChannels = 1;
-    const sampleRate = audioBuffer.sampleRate;
-    const samples = audioBuffer.getChannelData(0);
-    const buffer = new ArrayBuffer(44 + samples.length * 2);
-    const view = new DataView(buffer);
-
-    const writeStr = (offset, str) => { for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)); };
-    writeStr(0, "RIFF");
-    view.setUint32(4, 36 + samples.length * 2, true);
-    writeStr(8, "WAVE");
-    writeStr(12, "fmt ");
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true);
-    view.setUint16(22, numChannels, true);
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, sampleRate * 2, true);
-    view.setUint16(32, 2, true);
-    view.setUint16(34, 16, true);
-    writeStr(36, "data");
-    view.setUint32(40, samples.length * 2, true);
-
-    let offset = 44;
-    for (let i = 0; i < samples.length; i++) {
-      const s = Math.max(-1, Math.min(1, samples[i]));
-      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-      offset += 2;
-    }
-    return buffer;
-  };
-
   return (
     <>
       <style>{`
@@ -923,4 +916,14 @@ export default function App() {
       </div>
     </>
   );
+}
+
+export default function App() {
+  const path = window.location.pathname;
+
+  if (path === "/admin") return <AdminPanel />;
+  if (path === "/" || path === "/home") return <Home />;
+  if (path === "/voice") return <Voice />;
+
+  return <ChatApp />;
 }

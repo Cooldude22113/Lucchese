@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 
-const API = "https://api.lucchese.app";
+const API = import.meta.env.VITE_API_URL || "https://api.lucchese.app";
 
 const STATE = {
   IDLE:      "idle",
@@ -36,9 +36,23 @@ export default function Voice() {
   const streamRef        = useRef(null);
   const analyserRef      = useRef(null);
   const animFrameRef     = useRef(null);
-  const audioCtxRef      = useRef(null);
+  const audioCtxRef      = useRef(null);  // persistent — created on first tap, reused for all playback
   const silenceTimerRef  = useRef(null);
   const frameRef         = useRef(null);
+
+  // ── AudioContext — created once on user gesture and kept alive ───────────────
+  // iOS Safari requires AudioContext to be created/resumed within a user gesture.
+  // Creating a new context per playback means it's always suspended on iOS.
+  // Solution: create once on first tap, resume if suspended, reuse for all audio.
+  const getAudioContext = async () => {
+    if (!audioCtxRef.current) {
+      audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtxRef.current.state === "suspended") {
+      await audioCtxRef.current.resume();
+    }
+    return audioCtxRef.current;
+  };
 
   // ── Simulated pulse ─────────────────────────────────────────────────────────
   const startPulse = () => {
@@ -78,11 +92,15 @@ export default function Voice() {
   const startListening = async () => {
     try {
       setAudioError(null);
+
+      // Create/resume AudioContext within the user gesture — critical for iOS
+      await getAudioContext();
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      audioCtxRef.current = ctx;
+      // Use the persistent AudioContext for mic amplitude analysis
+      const ctx    = audioCtxRef.current;
       const source   = ctx.createMediaStreamSource(stream);
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 256;
@@ -118,7 +136,6 @@ export default function Voice() {
     mediaRecorderRef.current?.stop();
     streamRef.current?.getTracks().forEach(t => t.stop());
     stopAmplitudeLoop();
-    audioCtxRef.current?.close();
     setState(STATE.THINKING);
   };
 
@@ -137,19 +154,20 @@ export default function Voice() {
       if (!res.ok) { setState(STATE.IDLE); return; }
 
       const data = await res.json();
-        console.log("Response:", JSON.stringify({
-          transcript: data.transcript,
-          reply: data.reply?.slice(0, 50),
-          audio_b64_length: data.audio_b64?.length,
-          has_error: data.error,
-        }));
+      console.log("Response:", JSON.stringify({
+        transcript:      data.transcript,
+        reply:           data.reply?.slice(0, 50),
+        audio_b64_length: data.audio_b64?.length,
+        has_error:       data.error,
+      }));
+
       setTranscript(data.transcript || "");
       setReply(data.reply || "");
       if (data.conv_id) setConvId(data.conv_id);
       setAudioError(null);
 
       if (data.audio_b64) {
-        playBase64Audio(data.audio_b64);
+        await playBase64Audio(data.audio_b64);
       } else {
         setState(STATE.IDLE);
       }
@@ -161,30 +179,34 @@ export default function Voice() {
     }
   };
 
-  // ── Play base64 audio via AudioContext (mobile-friendly) ──────────────────
+  // ── Play base64 audio via persistent AudioContext ────────────────────────────
+  // Uses the context created during the user gesture tap — iOS won't block it.
   const playBase64Audio = async (b64) => {
     setState(STATE.SPEAKING);
     setAudioError(null);
     try {
+      // Decode base64 to ArrayBuffer
       const binary = atob(b64);
       const bytes  = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      const arrayBuffer = bytes.buffer;
 
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      // Get the persistent AudioContext — already resumed from the tap gesture
+      const ctx = await getAudioContext();
+
       let decoded;
       try {
-        decoded = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
+        decoded = await ctx.decodeAudioData(bytes.buffer);
       } catch (decodeErr) {
+        console.error("Decode error:", decodeErr);
         setAudioError("Failed to decode audio. Unsupported format.");
         stopPulse();
         setState(STATE.IDLE);
         return;
       }
 
-      const source = audioCtx.createBufferSource();
+      const source = ctx.createBufferSource();
       source.buffer = decoded;
-      source.connect(audioCtx.destination);
+      source.connect(ctx.destination);
 
       startPulse();
 
@@ -199,13 +221,7 @@ export default function Voice() {
         setState(STATE.IDLE);
       };
 
-      try {
-        source.start(0);
-      } catch (playErr) {
-        setAudioError("Could not start audio playback. Please try again.");
-        stopPulse();
-        setState(STATE.IDLE);
-      }
+      source.start(0);
 
     } catch (err) {
       console.error("Audio error:", err);

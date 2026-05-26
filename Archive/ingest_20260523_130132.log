@@ -1,0 +1,80 @@
+2026-05-23 13:01:32,252 [INFO] === INGEST RUN START === model=gemma2:27b files=['C:/Lucchese/conversations-000.json', 'C:/Lucchese/conversations-001.json', 'C:/Lucchese/conversations-002.json', 'C:/Lucchese/conversations-003.json', 'C:/Lucchese/conversations-004.json', 'C:/Lucchese/conversations-005.json', 'C:/Lucchese/conversations-006.json']
+2026-05-23 13:01:46,911 [INFO] Total to process: 640
+2026-05-23 13:01:46,911 [INFO] BATCH 1–1
+2026-05-23 13:01:46,911 [DEBUG] extract_messages: used accepted path (4 nodes, field=parent)
+2026-05-23 13:01:46,911 [INFO] NOISE_FILTER [03a3fb43-8b36-4302-9b45-0710824e58c7] title='Sports Armband Bag Description' reason='user content too thin (9 total words)'
+2026-05-23 13:01:46,914 [INFO] CHECKPOINT: saved 1 IDs after batch 1
+2026-05-23 13:01:46,914 [INFO] BATCH 2–2
+2026-05-23 13:01:46,915 [DEBUG] extract_messages: used accepted path (4 nodes, field=parent)
+2026-05-23 13:01:46,915 [INFO] NOISE_FILTER [0cbf06c7-3e30-4cf1-96f0-3b9b46efc55b] title='Karting safety marshal duties.' reason='user content too thin (7 total words)'
+2026-05-23 13:01:46,916 [INFO] CHECKPOINT: saved 2 IDs after batch 2
+2026-05-23 13:01:46,916 [INFO] BATCH 3–3
+2026-05-23 13:01:46,916 [DEBUG] extract_messages: used accepted path (4 nodes, field=parent)
+2026-05-23 13:01:46,916 [INFO] NOISE_FILTER [15220734-bc18-4b5c-a9be-81a1ba435591] title='Sub-niches of health.' reason='user content too thin (9 total words)'
+2026-05-23 13:01:46,916 [INFO] CHECKPOINT: saved 3 IDs after batch 3
+2026-05-23 13:01:46,916 [INFO] BATCH 4–4
+2026-05-23 13:01:46,916 [DEBUG] extract_messages: used accepted path (4 nodes, field=parent)
+2026-05-23 13:01:46,916 [INFO] NOISE_FILTER [2b4a1ae9-e5ec-4d88-b196-fd8c9a2aabec] title='Giants Did Not Build.' reason='user content too thin (5 total words)'
+2026-05-23 13:01:46,916 [INFO] CHECKPOINT: saved 4 IDs after batch 4
+2026-05-23 13:01:46,916 [INFO] BATCH 5–5
+2026-05-23 13:01:46,916 [DEBUG] extract_messages: used accepted path (4 nodes, field=parent)
+2026-05-23 13:01:46,916 [INFO] NOISE_FILTER [365f4240-1386-4f23-a32f-daebeab0f67c] title='Outlaw Song' reason='user content too thin (6 total words)'
+2026-05-23 13:01:46,916 [INFO] CHECKPOINT: saved 5 IDs after batch 5
+2026-05-23 13:01:46,916 [INFO] BATCH 6–6
+2026-05-23 13:01:46,916 [DEBUG] extract_messages: used accepted path (4 nodes, field=parent)
+2026-05-23 13:01:57,393 [DEBUG] SUMMARY [3a46fad7-9f9f-423f-a79b-a8c4f0248e75]: Alex is seeking a reseller partnership with a supplier, demonstrating entreprene
+2026-05-23 13:01:57,398 [INFO] PROCESSING [3a46fad7-9f9f-423f-a79b-a8c4f0248e75] title='Resell Partnership Proposal' era=building pairs=1
+2026-05-23 13:01:57,512 [INFO] CHECKPOINT: saved 6 IDs after batch 6
+2026-05-23 13:01:57,512 [INFO] BATCH 7–7
+2026-05-23 13:01:57,512 [DEBUG] extract_messages: used accepted path (6 nodes, field=parent)
+2026-05-23 13:01:57,512 [INFO] NOISE_FILTER [3a9df4ce-0ebe-4a5a-bcb3-aa30549567a9] title='Key Points about Musk' reason='user content too thin (8 total words)'
+2026-05-23 13:01:57,512 [INFO] CHECKPOINT: saved 7 IDs after batch 7
+2026-05-23 13:01:57,512 [INFO] BATCH 8–8
+2026-05-23 13:01:57,512 [DEBUG] extract_messages: used accepted path (6 nodes, field=parent)
+2026-05-23 13:02:03,083 [DEBUG] SUMMARY [52495f1f-2e28-46a4-b6e4-ed189b9c57f1]: Seeking a concise yet impactful title for a video on Elon Musk's ambitious visio
+2026-05-23 13:02:03,083 [INFO] PROCESSING [52495f1f-2e28-46a4-b6e4-ed189b9c57f1] title='Elon Musk's Vision' era=building pairs=2
+2026-05-23 13:02:03,248 [INFO] CHECKPOINT: saved 8 IDs after batch 8
+2026-05-23 13:02:03,248 [INFO] BATCH 9–9
+2026-05-23 13:02:03,248 [DEBUG] extract_messages: used accepted path (6 nodes, field=parent)
+2026-05-23 13:02:07,909 [DEBUG] SUMMARY [58e01d05-13d0-4349-ba88-50f1307c83ca]: Inquiring about the effects of nitrous oxide and cocaine, Alex demonstrates an i
+2026-05-23 13:02:07,909 [INFO] PROCESSING [58e01d05-13d0-4349-ba88-50f1307c83ca] title='Nitrous Oxide Effects' era=present pairs=2
+2026-05-23 13:02:08,079 [INFO] CHECKPOINT: saved 9 IDs after batch 9
+2026-05-23 13:02:08,079 [INFO] BATCH 10–10
+2026-05-23 13:02:08,079 [DEBUG] extract_messages: used accepted path (6 nodes, field=parent)
+2026-05-23 13:02:13,177 [DEBUG] SUMMARY [664344ed-fb7f-4bda-bbf2-39c197dd89e3]: Alex is seeking catchy subject lines for marketing emails, demonstrating an inte
+2026-05-23 13:02:13,177 [INFO] PROCESSING [664344ed-fb7f-4bda-bbf2-39c197dd89e3] title='Chiropractic Benefits' era=building pairs=2
+2026-05-23 13:02:13,340 [INFO] CHECKPOINT: saved 10 IDs after batch 10
+2026-05-23 13:02:13,340 [INFO] BATCH 11–11
+2026-05-23 13:02:13,340 [DEBUG] extract_messages: used accepted path (8 nodes, field=parent)
+2026-05-23 13:02:13,340 [DEBUG] [679d3799-a040-8002-a967-fd112f816b90]: 2 orphaned assistant message(s) dropped
+2026-05-23 13:02:13,342 [INFO] NOISE_FILTER [679d3799-a040-8002-a967-fd112f816b90] title='Pizza Truck Design' reason='pure image/artefact generation conversation'
+2026-05-23 13:02:13,342 [INFO] CHECKPOINT: saved 11 IDs after batch 11
+2026-05-23 13:02:13,342 [INFO] BATCH 12–12
+2026-05-23 13:02:13,342 [DEBUG] extract_messages: used accepted path (20 nodes, field=parent)
+2026-05-23 13:02:19,131 [DEBUG] SUMMARY [67a3bd69-688c-8002-9996-6c2c7f8e527c]: This conversation explores Alex's interest in illicit substances and advanced te
+2026-05-23 13:02:19,131 [INFO] PROCESSING [67a3bd69-688c-8002-9996-6c2c7f8e527c] title='Medical Cocaine Use' era=present pairs=9
+2026-05-23 13:02:19,131 [DEBUG] SKIP exchange 0 [67a3bd69-688c-8002-9996-6c2c7f8e527c] — user text below 5 words
+2026-05-23 13:02:19,131 [DEBUG] SKIP exchange 1 [67a3bd69-688c-8002-9996-6c2c7f8e527c] — user text below 5 words
+2026-05-23 13:02:19,305 [DEBUG] SKIP exchange 4 [67a3bd69-688c-8002-9996-6c2c7f8e527c] — user text below 5 words
+2026-05-23 13:02:19,395 [DEBUG] SKIP exchange 6 [67a3bd69-688c-8002-9996-6c2c7f8e527c] — user text below 5 words
+2026-05-23 13:02:19,395 [DEBUG] SKIP exchange 7 [67a3bd69-688c-8002-9996-6c2c7f8e527c] — user text below 5 words
+2026-05-23 13:02:19,482 [INFO] CHECKPOINT: saved 12 IDs after batch 12
+2026-05-23 13:02:19,482 [INFO] BATCH 13–13
+2026-05-23 13:02:19,482 [DEBUG] extract_messages: used accepted path (60 nodes, field=parent)
+2026-05-23 13:02:19,482 [DEBUG] [67a48c99-4858-8002-8ea9-642a45251401]: 14 orphaned assistant message(s) dropped
+2026-05-23 13:02:27,581 [DEBUG] SUMMARY [67a48c99-4858-8002-8ea9-642a45251401]: Alex is seeking a visually appealing and easily understandable webpage design fo
+2026-05-23 13:02:27,581 [INFO] PROCESSING [67a48c99-4858-8002-8ea9-642a45251401] title='E-waste Compliance Website' era=present pairs=11
+2026-05-23 13:02:28,381 [DEBUG] SKIP exchange 8 [67a48c99-4858-8002-8ea9-642a45251401] — user text below 5 words
+2026-05-23 13:02:28,559 [INFO] CHECKPOINT: saved 13 IDs after batch 13
+2026-05-23 13:02:28,559 [INFO] BATCH 14–14
+2026-05-23 13:02:28,561 [DEBUG] extract_messages: used accepted path (4 nodes, field=parent)
+2026-05-23 13:02:33,883 [DEBUG] SUMMARY [67a4aaef-1688-8002-aa54-d6f8080340f0]: The request for a "recycling rank system" reveals Alex's interest in gamifying e
+2026-05-23 13:02:33,883 [INFO] PROCESSING [67a4aaef-1688-8002-aa54-d6f8080340f0] title='Recycling Rank System' era=present pairs=1
+2026-05-23 13:02:33,970 [INFO] CHECKPOINT: saved 14 IDs after batch 14
+2026-05-23 13:02:33,970 [INFO] BATCH 15–15
+2026-05-23 13:02:33,970 [DEBUG] extract_messages: used accepted path (7 nodes, field=parent)
+2026-05-23 13:02:33,970 [DEBUG] [67a9152d-ca04-8002-b7c8-4004fb3bd4ac]: 2 orphaned assistant message(s) dropped
+2026-05-23 13:02:33,970 [INFO] NOISE_FILTER [67a9152d-ca04-8002-b7c8-4004fb3bd4ac] title='Speaker Purchase Contract' reason='single exchange with minimal content'
+2026-05-23 13:02:33,970 [INFO] CHECKPOINT: saved 15 IDs after batch 15
+2026-05-23 13:02:33,970 [INFO] BATCH 16–16
+2026-05-23 13:02:33,970 [DEBUG] extract_messages: used accepted path (6 nodes, field=parent)

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-const API = "https://api.lucchese.app";
+const API = import.meta.env.VITE_API_URL || "https://api.lucchese.app";
 
 const CATEGORY_COLORS = {
   food:       "#e8a87c",
@@ -145,8 +145,8 @@ export default function AdminPanel() {
 
   useEffect(() => {
     Promise.all([
-      fetch(`${API}/admin/stats`).then(r => r.json()),
-      fetch(`${API}/admin/recent?limit=30`).then(r => r.json()),
+      fetch(`${API}/admin/stats`, { headers: { "X-Admin-Key": import.meta.env.VITE_ADMIN_KEY }}).then(r => r.json()),
+      fetch(`${API}/admin/recent?limit=30`, { headers: { "X-Admin-Key": import.meta.env.VITE_ADMIN_KEY }}).then(r => r.json())
     ]).then(([s, r]) => {
       setStats(s);
       setRecent(r);
@@ -157,7 +157,9 @@ export default function AdminPanel() {
   const doSearch = async () => {
     if (!search.trim()) return;
     setSearching(true);
-    const res = await fetch(`${API}/admin/search?q=${encodeURIComponent(search)}&n=10`);
+    const res = await fetch(`${API}/admin/search?q=${encodeURIComponent(search)}&n=10`, {
+      headers: { "X-Admin-Key": import.meta.env.VITE_ADMIN_KEY }
+    });
     const data = await res.json();
     setResults(data);
     setSearching(false);
@@ -167,8 +169,13 @@ export default function AdminPanel() {
   const deleteSource = async (source) => {
     if (!confirm(`Delete all ${source} entries? This cannot be undone.`)) return;
     setDeleting(source);
-    await fetch(`${API}/admin/memory?source=${source}`, { method: "DELETE" });
-    const s = await fetch(`${API}/admin/stats`).then(r => r.json());
+    await fetch(`${API}/admin/memory?source=${source}`, {
+      method: "DELETE",
+      headers: { "X-Admin-Key": import.meta.env.VITE_ADMIN_KEY }
+    });
+    const s = await fetch(`${API}/admin/stats`, {
+      headers: { "X-Admin-Key": import.meta.env.VITE_ADMIN_KEY }
+    }).then(r => r.json());
     setStats(s);
     setDeleting(null);
   };
@@ -365,7 +372,10 @@ export default function AdminPanel() {
                     setSummarising(true);
                     setSummariseResult(null);
                     try {
-                      const res = await fetch(`${API}/admin/summarise`, { method: "POST" });
+                      const res = await fetch(`${API}/admin/summarise`, {
+                        method: "POST",
+                        headers: { "X-Admin-Key": import.meta.env.VITE_ADMIN_KEY }
+                      });
                       const data = await res.json();
                       setSummariseResult(data);
                     } catch (e) {

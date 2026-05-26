@@ -1,0 +1,17 @@
+Lucchese is a personal AI assistant ("Jarvis-style") built for Alex Hammond. Backend is Python/FastAPI. All routes live in /routes. The server entry point is main.py.
+LLM layer: Dual provider setup. CHAT_PROVIDER env var switches between Ollama (local, default) and Claude (Anthropic API). Local models are gemma2:27b (fast) and qwen2.5:32b (deep). Claude Sonnet 4.6 is the cloud fallback. All LLM calls go through routes/chat.py or routes/voice.py.
+Memory: ChromaDB (persistent, local) with 5 collections — knowledge (chunked conversation history), facts (user statements), style (user writing voice), documents (uploaded files), summaries (LLM-compressed category summaries). Embeddings via nomic-ai/nomic-embed-text-v1. Reranking via cross-encoder/ms-marco-MiniLM-L-6-v2. All memory logic in routes/memory.py.
+Retrieval pipeline: Query expansion (2 extra Ollama calls) → multi-collection vector search → cross-encoder rerank → recency scoring → top 10 results injected into system prompt.
+Classification: Flat category list used on live ingest path (routes/memory.py). Deep tiered taxonomy (9 top-level domains, 3 tiers deep) exists only in reclassify.py — a standalone batch script for retroactive classification of exported ChatGPT/Grok data. These two systems have diverged schemas and are not compatible without migration.
+Persistence: SQLite (conversations.db) for conversation history, messages, uploaded document records, and active roleplay sessions. ChromaDB for all vector/semantic data.
+Business logic modules:
+
+routes/deal.py — pure Python BTL property deal analyser, no LLM
+routes/shopify.py — creates Shopify products from Google Sheets recipe data
+routes/scrape.py — scrapes websites, builds structured review prompt for LLM
+routes/roleplay.py — Carol persona for property pitch practice, session-based, triggered via chat intercept
+routes/voice.py — Whisper (tiny model) for STT, ElevenLabs for TTS
+
+External dependencies: Google Sheets (live menu/recipe data via sheets.py), Shopify API (shopify_api.py), ElevenLabs API, DuckDuckGo search (DDGS, no API key).
+Ingestion scripts (root level, not part of server): ingestgpt.py, grok.py, and several versioned variants — standalone scripts for bulk-loading exported conversation history into ChromaDB.
+Known issues at time of writing: Live ingest in memory.py and reclassify.py operate on different metadata schemas — pair_idx, user_text_raw, and routing_done fields are missing from live ingest. Claude provider does not stream — full response collected then yielded as single token. Query expansion runs on every non-web-search message adding 2 Ollama calls to the hot path. Roleplay sessions have no TTL.

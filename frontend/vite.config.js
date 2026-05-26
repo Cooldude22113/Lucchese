@@ -8,5 +8,8 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     allowedHosts: ['lucchese.app', 'api.lucchese.app'],
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+    },
   },
 })

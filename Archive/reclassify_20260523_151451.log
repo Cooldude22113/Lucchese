@@ -1,0 +1,108 @@
+2026-05-23 15:14:51,331 [INFO] === RECLASSIFY START === model=gemma2:27b source=chatgpt limit=20 wipe=False
+2026-05-23 15:15:06,657 [INFO] Processing 20 groups (7905 chunks)
+2026-05-23 15:15:07,867 [DEBUG] TIER1 [cgpt_know_3a46fad7-9f9f-423f-a79b-a8c4f0248e75_0_0]: 'business'
+2026-05-23 15:15:08,647 [DEBUG] TIER1 [cgpt_know_52495f1f-2e28-46a4-b6e4-ed189b9c57f1_0_0]: 'technology'
+2026-05-23 15:15:12,522 [DEBUG] ONTOLOGY [cgpt_know_52495f1f-2e28-46a4-b6e4-ed189b9c57f1_0_0]: 'episteme' source='received'
+2026-05-23 15:15:16,282 [DEBUG] ONTOLOGY [cgpt_know_3a46fad7-9f9f-423f-a79b-a8c4f0248e75_0_0]: 'episteme' source='received'
+2026-05-23 15:15:17,142 [DEBUG] TIER1 [cgpt_know_52495f1f-2e28-46a4-b6e4-ed189b9c57f1_1_0]: 'technology'
+2026-05-23 15:15:21,109 [DEBUG] ONTOLOGY [cgpt_know_52495f1f-2e28-46a4-b6e4-ed189b9c57f1_1_0]: 'episteme' source='received'
+2026-05-23 15:15:21,925 [DEBUG] TIER1 [cgpt_know_58e01d05-13d0-4349-ba88-50f1307c83ca_0_0]: 'health'
+2026-05-23 15:15:25,960 [DEBUG] ONTOLOGY [cgpt_know_58e01d05-13d0-4349-ba88-50f1307c83ca_0_0]: 'episteme' source='received'
+2026-05-23 15:15:26,779 [DEBUG] TIER1 [cgpt_know_58e01d05-13d0-4349-ba88-50f1307c83ca_1_0]: 'health'
+2026-05-23 15:15:30,681 [DEBUG] ONTOLOGY [cgpt_know_58e01d05-13d0-4349-ba88-50f1307c83ca_1_0]: 'episteme' source='received'
+2026-05-23 15:15:31,535 [DEBUG] TIER1 [cgpt_know_664344ed-fb7f-4bda-bbf2-39c197dd89e3_0_0]: 'health'
+2026-05-23 15:15:35,395 [DEBUG] ONTOLOGY [cgpt_know_664344ed-fb7f-4bda-bbf2-39c197dd89e3_0_0]: 'episteme' source='received'
+2026-05-23 15:15:36,243 [DEBUG] TIER1 [cgpt_know_664344ed-fb7f-4bda-bbf2-39c197dd89e3_1_0]: 'business'
+2026-05-23 15:15:40,254 [DEBUG] ONTOLOGY [cgpt_know_664344ed-fb7f-4bda-bbf2-39c197dd89e3_1_0]: 'episteme' source='received'
+2026-05-23 15:15:41,120 [DEBUG] TIER1 [cgpt_know_67a3bd69-688c-8002-9996-6c2c7f8e527c_2_0]: 'health'
+2026-05-23 15:15:45,086 [DEBUG] ONTOLOGY [cgpt_know_67a3bd69-688c-8002-9996-6c2c7f8e527c_2_0]: 'episteme' source='received'
+2026-05-23 15:15:45,958 [DEBUG] TIER1 [cgpt_know_67a3bd69-688c-8002-9996-6c2c7f8e527c_3_0]: 'science'
+2026-05-23 15:15:49,763 [DEBUG] ONTOLOGY [cgpt_know_67a3bd69-688c-8002-9996-6c2c7f8e527c_3_0]: 'episteme' source='received'
+2026-05-23 15:15:50,628 [DEBUG] TIER1 [cgpt_know_67a3bd69-688c-8002-9996-6c2c7f8e527c_5_0]: 'technology'
+2026-05-23 15:15:54,345 [DEBUG] ONTOLOGY [cgpt_know_67a3bd69-688c-8002-9996-6c2c7f8e527c_5_0]: 'episteme' source='received'
+2026-05-23 15:15:55,165 [DEBUG] TIER1 [cgpt_know_67a3bd69-688c-8002-9996-6c2c7f8e527c_8_0]: 'science'
+2026-05-23 15:15:59,134 [DEBUG] ONTOLOGY [cgpt_know_67a3bd69-688c-8002-9996-6c2c7f8e527c_8_0]: 'episteme' source='received'
+2026-05-23 15:15:59,964 [DEBUG] TIER1 [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_0_0]: 'technology'
+2026-05-23 15:16:03,723 [DEBUG] ONTOLOGY [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_0_0]: 'techne' source='received'
+2026-05-23 15:16:04,563 [DEBUG] TIER1 [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_1_0]: 'technology'
+2026-05-23 15:16:08,408 [DEBUG] ONTOLOGY [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_1_0]: 'episteme' source='received'
+2026-05-23 15:16:09,243 [DEBUG] TIER1 [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_2_0]: 'technology'
+2026-05-23 15:16:13,158 [DEBUG] ONTOLOGY [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_2_0]: 'episteme' source='received'
+2026-05-23 15:16:14,009 [DEBUG] TIER1 [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_3_0]: 'technology'
+2026-05-23 15:16:17,844 [DEBUG] ONTOLOGY [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_3_0]: 'episteme' source='received'
+2026-05-23 15:16:18,691 [DEBUG] TIER1 [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_4_0]: 'technology'
+2026-05-23 15:16:22,523 [DEBUG] ONTOLOGY [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_4_0]: 'episteme' source='received'
+2026-05-23 15:16:23,379 [DEBUG] TIER1 [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_5_0]: 'technology'
+2026-05-23 15:16:27,304 [DEBUG] ONTOLOGY [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_5_0]: 'episteme' source='received'
+2026-05-23 15:16:28,171 [DEBUG] TIER1 [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_6_0]: 'technology'
+2026-05-23 15:16:33,469 [DEBUG] ONTOLOGY [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_6_0]: 'techne' source='received'
+2026-05-23 15:16:34,361 [DEBUG] TIER1 [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_7_0]: 'technology'
+2026-05-23 15:16:39,723 [DEBUG] ONTOLOGY [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_7_0]: 'episteme' source='received'
+2026-05-23 15:16:40,563 [DEBUG] TIER1 [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_9_0]: 'technology'
+2026-05-23 15:16:45,671 [DEBUG] ONTOLOGY [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_9_0]: 'episteme' source='received'
+2026-05-23 15:16:57,654 [WARNING] VALIDATE_TIER [cgpt_know_52495f1f-2e28-46a4-b6e4-ed189b9c57f1_0_0 primary]: t2 'prompting' invalid for 'technology' -> 'computing'
+2026-05-23 15:16:57,654 [WARNING] VALIDATE_TIER [cgpt_know_52495f1f-2e28-46a4-b6e4-ed189b9c57f1_0_0 primary]: t3 '' invalid for 'technology/computing' -> 'software'
+2026-05-23 15:16:57,654 [INFO] VALIDATE_TIER [cgpt_know_52495f1f-2e28-46a4-b6e4-ed189b9c57f1_0_0 primary]: ('technology', 'prompting', '') -> (technology, computing, software)
+2026-05-23 15:16:57,654 [DEBUG] TIER23 [cgpt_know_52495f1f-2e28-46a4-b6e4-ed189b9c57f1_0_0]: technology/computing/software secondary=none
+2026-05-23 15:17:01,741 [DEBUG] ROUTING [cgpt_know_52495f1f-2e28-46a4-b6e4-ed189b9c57f1_0_0]: {'facts': False, 'style': False, 'engagement': 'passive'}
+2026-05-23 15:17:13,265 [WARNING] VALIDATE_TIER [cgpt_know_3a46fad7-9f9f-423f-a79b-a8c4f0248e75_0_0 primary]: t2 'customers' invalid for 'business' -> 'operations'
+2026-05-23 15:17:13,266 [WARNING] VALIDATE_TIER [cgpt_know_3a46fad7-9f9f-423f-a79b-a8c4f0248e75_0_0 primary]: t3 '' invalid for 'business/operations' -> 'systems'
+2026-05-23 15:17:13,266 [INFO] VALIDATE_TIER [cgpt_know_3a46fad7-9f9f-423f-a79b-a8c4f0248e75_0_0 primary]: ('business', 'customers', '') -> (business, operations, systems)
+2026-05-23 15:17:13,266 [DEBUG] TIER23 [cgpt_know_3a46fad7-9f9f-423f-a79b-a8c4f0248e75_0_0]: business/operations/systems secondary=none
+2026-05-23 15:17:17,201 [DEBUG] ROUTING [cgpt_know_3a46fad7-9f9f-423f-a79b-a8c4f0248e75_0_0]: {'facts': False, 'style': False, 'engagement': 'passive'}
+2026-05-23 15:17:29,016 [WARNING] VALIDATE_TIER [cgpt_know_52495f1f-2e28-46a4-b6e4-ed189b9c57f1_1_0 primary]: t2 'prompting' invalid for 'technology' -> 'computing'
+2026-05-23 15:17:29,016 [WARNING] VALIDATE_TIER [cgpt_know_52495f1f-2e28-46a4-b6e4-ed189b9c57f1_1_0 primary]: t3 '' invalid for 'technology/computing' -> 'software'
+2026-05-23 15:17:29,016 [INFO] VALIDATE_TIER [cgpt_know_52495f1f-2e28-46a4-b6e4-ed189b9c57f1_1_0 primary]: ('technology', 'prompting', '') -> (technology, computing, software)
+2026-05-23 15:17:29,017 [DEBUG] TIER23 [cgpt_know_52495f1f-2e28-46a4-b6e4-ed189b9c57f1_1_0]: technology/computing/software secondary=none
+2026-05-23 15:17:32,875 [DEBUG] ROUTING [cgpt_know_52495f1f-2e28-46a4-b6e4-ed189b9c57f1_1_0]: {'facts': False, 'style': False, 'engagement': 'passive'}
+2026-05-23 15:17:45,493 [DEBUG] TIER23 [cgpt_know_58e01d05-13d0-4349-ba88-50f1307c83ca_0_0]: health/compounds/harm_reduction secondary=none
+2026-05-23 15:17:49,427 [DEBUG] ROUTING [cgpt_know_58e01d05-13d0-4349-ba88-50f1307c83ca_0_0]: {'facts': False, 'style': False, 'engagement': 'passive'}
+2026-05-23 15:18:01,966 [DEBUG] TIER23 [cgpt_know_58e01d05-13d0-4349-ba88-50f1307c83ca_1_0]: health/compounds/harm_reduction secondary=none
+2026-05-23 15:18:05,837 [DEBUG] ROUTING [cgpt_know_58e01d05-13d0-4349-ba88-50f1307c83ca_1_0]: {'facts': False, 'style': False, 'engagement': 'passive'}
+2026-05-23 15:18:17,670 [DEBUG] TIER23 [cgpt_know_664344ed-fb7f-4bda-bbf2-39c197dd89e3_0_0]: health/medical/treatment secondary=none
+2026-05-23 15:18:21,651 [DEBUG] ROUTING [cgpt_know_664344ed-fb7f-4bda-bbf2-39c197dd89e3_0_0]: {'facts': False, 'style': False, 'engagement': 'passive'}
+2026-05-23 15:18:33,538 [DEBUG] TIER23 [cgpt_know_664344ed-fb7f-4bda-bbf2-39c197dd89e3_1_0]: business/marketing/copywriting secondary=none
+2026-05-23 15:18:37,222 [DEBUG] ROUTING [cgpt_know_664344ed-fb7f-4bda-bbf2-39c197dd89e3_1_0]: {'facts': False, 'style': False, 'engagement': 'passive'}
+2026-05-23 15:18:50,094 [DEBUG] TIER23 [cgpt_know_67a3bd69-688c-8002-9996-6c2c7f8e527c_2_0]: health/compounds/harm_reduction secondary=none
+2026-05-23 15:18:53,981 [DEBUG] ROUTING [cgpt_know_67a3bd69-688c-8002-9996-6c2c7f8e527c_2_0]: {'facts': False, 'style': False, 'engagement': 'passive'}
+2026-05-23 15:19:05,308 [DEBUG] TIER23 [cgpt_know_67a3bd69-688c-8002-9996-6c2c7f8e527c_3_0]: science/chemistry/synthesis secondary=none
+2026-05-23 15:19:09,142 [DEBUG] ROUTING [cgpt_know_67a3bd69-688c-8002-9996-6c2c7f8e527c_3_0]: {'facts': False, 'style': False, 'engagement': 'passive'}
+2026-05-23 15:19:21,545 [DEBUG] TIER23 [cgpt_know_67a3bd69-688c-8002-9996-6c2c7f8e527c_5_0]: technology/security/infosec secondary=none
+2026-05-23 15:19:25,801 [DEBUG] ROUTING [cgpt_know_67a3bd69-688c-8002-9996-6c2c7f8e527c_5_0]: {'facts': False, 'style': False, 'engagement': 'passive'}
+2026-05-23 15:19:37,936 [DEBUG] TIER23 [cgpt_know_67a3bd69-688c-8002-9996-6c2c7f8e527c_8_0]: science/physics/quantum_mechanics secondary=none
+2026-05-23 15:19:42,149 [DEBUG] ROUTING [cgpt_know_67a3bd69-688c-8002-9996-6c2c7f8e527c_8_0]: {'facts': False, 'style': False, 'engagement': 'passive'}
+2026-05-23 15:19:53,734 [DEBUG] TIER23 [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_0_0]: technology/web/frontend secondary=none
+2026-05-23 15:19:57,543 [DEBUG] ROUTING [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_0_0]: {'facts': False, 'style': False, 'engagement': 'passive'}
+2026-05-23 15:20:09,258 [DEBUG] TIER23 [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_1_0]: technology/web/frontend secondary=none
+2026-05-23 15:20:13,057 [DEBUG] ROUTING [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_1_0]: {'facts': False, 'style': False, 'engagement': 'passive'}
+2026-05-23 15:20:24,771 [DEBUG] TIER23 [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_2_0]: technology/ai/models secondary=none
+2026-05-23 15:20:28,620 [DEBUG] ROUTING [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_2_0]: {'facts': False, 'style': False, 'engagement': 'passive'}
+2026-05-23 15:20:40,086 [WARNING] VALIDATE_TIER [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_3_0 primary]: t2 'prompting' invalid for 'technology' -> 'computing'
+2026-05-23 15:20:40,086 [WARNING] VALIDATE_TIER [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_3_0 primary]: t3 '' invalid for 'technology/computing' -> 'software'
+2026-05-23 15:20:40,086 [INFO] VALIDATE_TIER [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_3_0 primary]: ('technology', 'prompting', '') -> (technology, computing, software)
+2026-05-23 15:20:40,086 [DEBUG] TIER23 [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_3_0]: technology/computing/software secondary=none
+2026-05-23 15:20:44,050 [DEBUG] ROUTING [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_3_0]: {'facts': False, 'style': False, 'engagement': 'passive'}
+2026-05-23 15:20:55,990 [WARNING] VALIDATE_TIER [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_4_0 primary]: t2 'prompting' invalid for 'technology' -> 'computing'
+2026-05-23 15:20:55,990 [WARNING] VALIDATE_TIER [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_4_0 primary]: t3 '' invalid for 'technology/computing' -> 'software'
+2026-05-23 15:20:55,991 [INFO] VALIDATE_TIER [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_4_0 primary]: ('technology', 'prompting', '') -> (technology, computing, software)
+2026-05-23 15:20:55,991 [DEBUG] TIER23 [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_4_0]: technology/computing/software secondary=none
+2026-05-23 15:21:00,026 [DEBUG] ROUTING [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_4_0]: {'facts': False, 'style': False, 'engagement': 'passive'}
+2026-05-23 15:21:12,221 [WARNING] VALIDATE_TIER [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_5_0 primary]: t2 'design' invalid for 'technology' -> 'computing'
+2026-05-23 15:21:12,222 [WARNING] VALIDATE_TIER [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_5_0 primary]: t3 '' invalid for 'technology/computing' -> 'software'
+2026-05-23 15:21:12,222 [INFO] VALIDATE_TIER [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_5_0 primary]: ('technology', 'design', '') -> (technology, computing, software)
+2026-05-23 15:21:12,222 [DEBUG] TIER23 [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_5_0]: technology/computing/software secondary=none
+2026-05-23 15:21:16,299 [DEBUG] ROUTING [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_5_0]: {'facts': False, 'style': False, 'engagement': 'passive'}
+2026-05-23 15:21:28,607 [WARNING] VALIDATE_TIER [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_6_0 primary]: t2 'prompting' invalid for 'technology' -> 'computing'
+2026-05-23 15:21:28,607 [WARNING] VALIDATE_TIER [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_6_0 primary]: t3 '' invalid for 'technology/computing' -> 'software'
+2026-05-23 15:21:28,608 [INFO] VALIDATE_TIER [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_6_0 primary]: ('technology', 'prompting', '') -> (technology, computing, software)
+2026-05-23 15:21:28,608 [DEBUG] TIER23 [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_6_0]: technology/computing/software secondary=none
+2026-05-23 15:21:32,577 [DEBUG] ROUTING [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_6_0]: {'facts': False, 'style': False, 'engagement': 'passive'}
+2026-05-23 15:21:45,076 [DEBUG] TIER23 [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_7_0]: technology/ai/prompting secondary=none
+2026-05-23 15:21:49,180 [DEBUG] ROUTING [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_7_0]: {'facts': False, 'style': False, 'engagement': 'passive'}
+2026-05-23 15:22:01,686 [WARNING] VALIDATE_TIER [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_9_0 primary]: t2 'prompting' invalid for 'technology' -> 'computing'
+2026-05-23 15:22:01,686 [WARNING] VALIDATE_TIER [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_9_0 primary]: t3 '' invalid for 'technology/computing' -> 'software'
+2026-05-23 15:22:01,687 [INFO] VALIDATE_TIER [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_9_0 primary]: ('technology', 'prompting', '') -> (technology, computing, software)
+2026-05-23 15:22:01,687 [DEBUG] TIER23 [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_9_0]: technology/computing/software secondary=none
+2026-05-23 15:22:06,073 [DEBUG] ROUTING [cgpt_know_67a48c99-4858-8002-8ea9-642a45251401_9_0]: {'facts': False, 'style': False, 'engagement': 'passive'}
+2026-05-23 15:22:06,107 [INFO] BATCH 1-20 | stats={'exchanges': 20, 'chunks': 20, 'facts': 0, 'style': 0, 'errors': 0}
+2026-05-23 15:22:06,112 [INFO] === RECLASSIFY COMPLETE === stats={'exchanges': 20, 'chunks': 20, 'facts': 0, 'style': 0, 'errors': 0}
