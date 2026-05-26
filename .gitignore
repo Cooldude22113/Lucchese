@@ -1,10 +1,46 @@
+# Secrets
 .env
 credentials.json
+cloudfare id.txt
+*cloudflare*.txt
+*cloudfare*.txt
+
+# Databases / local state
+*.db
+*.sqlite
+*.sqlite3
+
+# Chroma / vector DB
 chroma_db/
-conversations.db
+backend/chroma_db/
+
+# Logs
+*.log
+
+# Checkpoints / exports
+*checkpoint*.json
+conversations-*.json
+prod-grok*.json
+
+# Local/generated/debug
+backend/generated_docs/
+generated_docs/
+Archive/
+backend/checkdb.py
+backend/check_entries.py
+backend/check_entries*.py
+
+# Python
 __pycache__/
 *.pyc
-node_modules/
-dist/
 .venv/
 venv/
+
+# Node
+node_modules/
+dist/
+
+# Editor / OS
+.vscode/
+.DS_Store
+Thumbs.db
