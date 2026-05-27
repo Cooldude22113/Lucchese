@@ -1,0 +1,23 @@
+A task is considered complete only if:
+
+requirements are satisfied
+implementation matches specification
+review passes
+failures are handled
+rollback is possible
+logs exist where required
+hidden behavior is minimized
+operational risk is understood
+architecture boundaries remain intact
+no unrelated systems were rewritten
+
+Additionally:
+
+AI-system tasks must verify:
+
+context safety
+prompt safety
+token growth awareness
+model failure handling
+stale-memory handling
+explicit state ownership

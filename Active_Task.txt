@@ -1,0 +1,48 @@
+Current Focus
+
+Operational stabilization and production maturity.
+
+Lucchese complexity is increasing faster than operational clarity.
+
+The current priority is reducing chaos and improving maintainability before expanding major capabilities.
+
+Current Objectives
+stabilize context assembly
+improve observability
+improve profile_state reliability
+improve startup reliability
+improve deployment discipline
+improve debugging clarity
+reduce hidden behavior
+Allowed Work
+observability improvements
+logging improvements
+context inspection
+state hardening
+startup validation
+rollback safety
+stabilization work
+production safety improvements
+retrieval reliability improvements
+maintenance improvements
+Forbidden Work
+speculative agent systems
+autonomous routines
+large infrastructure redesigns
+premature orchestration systems
+unnecessary framework migration
+uncontrolled memory-system rewrites
+major feature expansion without stabilization
+Current Philosophy
+
+The system currently needs:
+
+clarity
+reliability
+operational discipline
+
+more than:
+
+new capabilities
+complexity
+AI novelty

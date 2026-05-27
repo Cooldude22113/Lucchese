@@ -142,14 +142,17 @@ export default function AdminPanel() {
   const [loading, setLoading]         = useState(true);
   const [summarising, setSummarising] = useState(false);
   const [summariseResult, setSummariseResult] = useState(null);
+  const [summaries, setSummaries]             = useState([]);
 
   useEffect(() => {
     Promise.all([
       fetch(`${API}/admin/stats`, { headers: { "X-Admin-Key": import.meta.env.VITE_ADMIN_KEY }}).then(r => r.json()),
-      fetch(`${API}/admin/recent?limit=30`, { headers: { "X-Admin-Key": import.meta.env.VITE_ADMIN_KEY }}).then(r => r.json())
-    ]).then(([s, r]) => {
+      fetch(`${API}/admin/recent?limit=30`, { headers: { "X-Admin-Key": import.meta.env.VITE_ADMIN_KEY }}).then(r => r.json()),
+      fetch(`${API}/admin/summaries`, { headers: { "X-Admin-Key": import.meta.env.VITE_ADMIN_KEY }}).then(r => r.json()),
+    ]).then(([s, r, su]) => {
       setStats(s);
       setRecent(r);
+      setSummaries(Array.isArray(su) ? su : []);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
@@ -248,7 +251,7 @@ export default function AdminPanel() {
 
         {/* Tabs */}
         <div style={{ display: "flex", gap: 8, marginBottom: "1.5rem" }}>
-          {["overview", "recent", "search", "manage"].map(t => (
+          {["overview", "recent", "search", "summaries", "manage"].map(t => (
             <button key={t} onClick={() => setActiveTab(t)} style={{
               padding: "0.45rem 1rem",
               borderRadius: 8,
@@ -349,6 +352,68 @@ export default function AdminPanel() {
                 )}
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Summaries tab */}
+        {activeTab === "summaries" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            {summaries.length === 0 ? (
+              <div style={{
+                background: "#0f0f0f", border: "1px solid #1e1e1e",
+                borderRadius: 12, padding: "2.5rem",
+              }}>
+                <p style={{ fontSize: "0.8rem", color: "#444", textAlign: "center" }}>
+                  No summaries yet — go to{" "}
+                  <span
+                    style={{ color: "#c8a96e", cursor: "pointer" }}
+                    onClick={() => setActiveTab("manage")}
+                  >
+                    Manage → Rebuild Summaries
+                  </span>
+                </p>
+              </div>
+            ) : (
+              summaries.map((item, i) => {
+                const catColor = CATEGORY_COLORS[item.category] || "#666";
+                const date = item.last_updated
+                  ? new Date(item.last_updated).toLocaleDateString("en-GB", {
+                      day: "numeric", month: "short", year: "numeric",
+                    })
+                  : null;
+                return (
+                  <div key={i} style={{
+                    background: "#0f0f0f", border: "1px solid #1e1e1e",
+                    borderRadius: 12, padding: "1.2rem 1.5rem",
+                  }}>
+                    <div style={{
+                      display: "flex", alignItems: "center",
+                      justifyContent: "space-between", marginBottom: "0.8rem",
+                    }}>
+                      <span style={{
+                        fontSize: "0.62rem", padding: "2px 6px", borderRadius: 4,
+                        background: `${catColor}22`, color: catColor,
+                        border: `1px solid ${catColor}44`,
+                        textTransform: "capitalize",
+                      }}>{item.category}</span>
+                      {date && (
+                        <span style={{ fontSize: "0.65rem", color: "#444" }}>
+                          Generated {date}
+                        </span>
+                      )}
+                    </div>
+                    <p style={{ fontSize: "0.82rem", color: "#ccc", lineHeight: 1.6 }}>
+                      {item.summary}
+                    </p>
+                    {item.entry_count && (
+                      <p style={{ fontSize: "0.65rem", color: "#444", marginTop: "0.6rem" }}>
+                        {item.entry_count} entries
+                      </p>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
         )}
 

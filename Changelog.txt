@@ -1,0 +1,25 @@
+Format
+Date
+Added
+new capabilities
+Changed
+modified behavior
+Fixed
+resolved issues
+Removed
+removed systems
+Risks
+known operational concerns
+Philosophy
+
+Changes should remain:
+
+traceable
+understandable
+operationally visible
+
+Avoid:
+
+undocumented system mutation
+invisible infrastructure changes
+tribal-knowledge deployments

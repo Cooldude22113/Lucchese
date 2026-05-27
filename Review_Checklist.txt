@@ -1,0 +1,22 @@
+Review should verify:
+
+requirements satisfied
+architecture preserved
+rollback possible
+hidden failures minimized
+observability preserved
+AI output handling safe
+state ownership explicit
+stale-memory handling safe
+prompt/context behavior safe
+operational risks understood
+no uncontrolled complexity introduced
+
+Review should reject:
+
+hidden behavior
+unsafe state mutation
+architecture drift
+speculative infrastructure
+silent failure paths
+unsafe AI orchestration
