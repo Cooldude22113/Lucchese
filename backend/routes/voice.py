@@ -23,8 +23,9 @@ from fastapi.responses import Response, JSONResponse
 from pydantic import BaseModel
 
 from routes.config import OLLAMA_URL, MODEL_FAST, CHAT_PROVIDER, ANTHROPIC_API_KEY, whisper_model, el_client, ELEVENLABS_VOICE_ID
-from routes.memory import search_memory, should_ingest, ingest_exchange
+from routes.memory import should_ingest, ingest_exchange
 from routes.database import save_message, get_conversation_history
+from routes.context_builder import build_context
 from routes.chat import build_system_prompt
 
 router = APIRouter()
@@ -112,6 +113,8 @@ def _prepare_tts_chunks(text: str) -> list[str]:
 # ── /voice-chat ───────────────────────────────────────────────────────────────
 @router.post("/voice-chat")
 async def voice_chat(file: UploadFile = File(...), conversation_id: str = None):
+    if not el_client:
+        return JSONResponse(content={"error": "ElevenLabs not configured"}, status_code=503)
     """
     Full voice pipeline:
       1. Transcribe audio → text (Whisper)
@@ -130,9 +133,8 @@ async def voice_chat(file: UploadFile = File(...), conversation_id: str = None):
         conv_id = conversation_id or str(uuid.uuid4())
 
         # 2. Build context
-        memory = await search_memory(user_text)
-
-        system = build_system_prompt(memory, "", "")
+        ctx = await build_context(user_text)
+        system = build_system_prompt(ctx, "", "")
 
         # Load last 20 messages for continuity
         history = get_conversation_history(conv_id, limit=20)
@@ -160,6 +162,8 @@ async def voice_chat(file: UploadFile = File(...), conversation_id: str = None):
                         "messages":   chat_messages,
                     }
                 )
+            if res.status_code != 200:
+                raise Exception(f"Anthropic API error {res.status_code}: {res.text[:200]}")
             reply_text = res.json()["content"][0]["text"]
         else:
             async with httpx.AsyncClient(timeout=300) as client:

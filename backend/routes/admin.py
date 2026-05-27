@@ -69,7 +69,7 @@ def admin_recent(limit: int = 20, admin_key: str = Depends(verify_admin_key)):
     Most recently ingested facts, sorted by created_at descending.
     Used by the AdminPanel recent tab.
     """
-    results = col_facts.get(include=["documents", "metadatas"])
+    results = col_facts.get(include=["documents", "metadatas"], limit=500)
     items = [
         {
             "text":       doc[:120],
@@ -87,6 +87,8 @@ def admin_recent(limit: int = 20, admin_key: str = Depends(verify_admin_key)):
 # ── GET /admin/search ─────────────────────────────────────────────────────────
 @router.get("/admin/search")
 def admin_search(q: str = "", n: int = 10, admin_key: str = Depends(verify_admin_key)):
+    if not q.strip():
+        raise HTTPException(400, "Query parameter 'q' is required")    
     """
     Semantic search across the facts collection.
     Returns up to n results with relevance scores.
@@ -115,6 +117,8 @@ def admin_search(q: str = "", n: int = 10, admin_key: str = Depends(verify_admin
 # ── DELETE /admin/memory ──────────────────────────────────────────────────────
 @router.delete("/admin/memory")
 def admin_delete_memory(source: str = "", admin_key: str = Depends(verify_admin_key)):
+    if not source.strip():
+        raise HTTPException(400, "Source parameter is required")
     """
     Delete all memory entries from a given source across all collections.
     e.g. DELETE /admin/memory?source=lucchese

@@ -17,7 +17,7 @@ import os
 load_dotenv()
 
 # ── Config ────────────────────────────────────────────────────────────────────
-CHROMA_PATH   = "./chroma_db"
+CHROMA_PATH = os.getenv("CHROMA_PATH", "./chroma_db")
 EMBED_MODEL   = "nomic-ai/nomic-embed-text-v1"
 CHUNK_SIZE    = 800
 CHUNK_OVERLAP = 100
@@ -26,6 +26,10 @@ OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434") + "/api/chat
 MODEL_FAST = os.getenv("MODEL_FAST", "gemma2:27b")
 
 SIMILARITY_THRESHOLD = 0.25  # L2 distance — lower = stricter dedup
+
+# Recency bonus applied to cross-encoder scores. Tune this constant to
+# shift the balance between semantic relevance and recency.
+RECENCY_WEIGHT = 0.1
 
 # ── ChromaDB setup ────────────────────────────────────────────────────────────
 ef = embedding_functions.SentenceTransformerEmbeddingFunction(
@@ -84,19 +88,6 @@ def chunk_text(text: str) -> list[str]:
 
     return [c for c in chunks if c.strip()]
 
-CATEGORIES = [
-    "ptpreps", "coaching", "fitness", "food", "cooking", "health",
-    "compounds", "supplements_nootropics", "psychedelics", "property",
-    "finance", "money", "lucchese", "tech", "security", "ai", "hardware",
-    "content", "music", "media_gaming", "psychology", "mindset",
-    "neuroscience", "social_dynamics", "family", "relationships", "travel",
-    "spirituality", "conspiracy", "religion_esoteric", "philosophy",
-    "politics", "economics", "history_culture", "science", "mental_health",
-    "career", "pub", "general"
-]
-
-CATEGORY_LIST = ", ".join(CATEGORIES)
-
 
 # ── Deduplication ─────────────────────────────────────────────────────────────
 def is_duplicate_memory(text: str, collection, n: int = 1) -> bool:
@@ -106,8 +97,8 @@ def is_duplicate_memory(text: str, collection, n: int = 1) -> bool:
         if results["distances"] and results["distances"][0]:
             closest_distance = results["distances"][0][0]
             return closest_distance < SIMILARITY_THRESHOLD
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("is_duplicate_memory check failed: %s — allowing write", e)
     return False
 
 # ── Classification ────────────────────────────────────────────────────────────
@@ -312,11 +303,18 @@ Rephrasings:"""
                     }
                 }
             )
-            lines = res.json()["message"]["content"].strip().split("\n")
+            res.raise_for_status()
+            data = res.json()
+
+            if "message" not in data or "content" not in data["message"]:
+                print(f"expand_query bad response: {data}")
+                return [query]
+
+            lines = data["message"]["content"].strip().split("\n")
             expansions = [l.strip() for l in lines if l.strip()][:2]
             return [query] + expansions
     except Exception as e:
-        print(f"expand_query error: {e}")
+        logger.error("expand_query error: %s", e)
         return [query]
 
 # ── Search ────────────────────────────────────────────────────────────────────
@@ -353,7 +351,7 @@ async def search_memory(query: str, n: int = 5) -> str:
                     doc.strip()
                 ))
     except Exception as e:
-        print(f"Summary search error: {e}")
+        logger.error("Summary search error: %s", e)
 
     # ── Step 2: Expand query and pull chunks ──────────────────────────────────
     queries    = await expand_query(query)
@@ -414,7 +412,7 @@ async def search_memory(query: str, n: int = 5) -> str:
             pairs  = [(query, c["doc"]) for c in raw_chunks]
             scores = reranker.predict(pairs)
             for chunk, score in zip(raw_chunks, scores):
-                recency_bonus = chunk["recency"] * 0.1
+                recency_bonus = chunk["recency"] * RECENCY_WEIGHT
                 fact_bonus    = 0.05 if chunk["is_fact"] else 0.0
                 final_score   = float(score) + recency_bonus + fact_bonus
                 candidates.append((final_score, chunk["label"], chunk["doc"]))

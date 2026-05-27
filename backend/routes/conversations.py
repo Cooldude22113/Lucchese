@@ -90,11 +90,12 @@ async def feedback(req: FeedbackRequest):
         return {"ingested": True}
 
     # bad rating — try to remove if already ingested
-    try:
-        results = col_knowledge.get(where={"conv_id": req.conversation_id})
-        if results["ids"]:
-            col_knowledge.delete(ids=results["ids"])
-    except Exception as e:
-        print(f"feedback delete error: {e}")
+    for col in [col_knowledge, col_facts, col_style]:
+        try:
+            results = col.get(where={"conv_id": req.conversation_id})
+            if results["ids"]:
+                col.delete(ids=results["ids"])
+        except Exception as e:
+            print(f"feedback delete error: {e}")
 
     return {"ingested": False}

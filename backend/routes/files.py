@@ -71,6 +71,10 @@ async def upload_document(file: UploadFile = File(...)):
         "message":     f"Ingested {chunk_count} chunks from {filename}",
     }
 
+class GenerateDocRequest(BaseModel):
+    content: str
+    title: str = "document"
+
 # ── GET /documents ────────────────────────────────────────────────────────────
 @router.get("/documents")
 def list_docs():
@@ -96,7 +100,7 @@ def delete_document(doc_id: str):
 
 # ── POST /generate-doc ────────────────────────────────────────────────────────
 @router.post("/generate-doc")
-async def generate_doc(req: dict):
+async def generate_doc(req: GenerateDocRequest):
     """
     Called by the frontend when it detects a [GENERATE_DOC: ...] marker.
     Converts markdown content to a .docx file and returns a download token.
@@ -104,8 +108,9 @@ async def generate_doc(req: dict):
     Body: { "content": "...", "title": "..." }
     Returns: { "token": "...", "filename": "..." }
     """
-    content = req.get("content", "").strip()
-    title   = req.get("title", "document").strip()
+    content = req.content.strip()
+    title   = req.title.strip()
+
 
     if not content:
         return {"error": "No content provided"}

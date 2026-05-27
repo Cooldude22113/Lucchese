@@ -22,7 +22,7 @@ CHAT_PROVIDER     = os.getenv("CHAT_PROVIDER", "ollama")
 # ── ElevenLabs ────────────────────────────────────────────────────────────────
 ELEVENLABS_API_KEY  = os.getenv("ELEVENLABS_API_KEY")
 ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID")
-el_client           = ElevenLabs(api_key=ELEVENLABS_API_KEY)
+el_client           = ElevenLabs(api_key=ELEVENLABS_API_KEY) if ELEVENLABS_API_KEY else None
 
 # ── Whisper ───────────────────────────────────────────────────────────────────
 # TODO: upgrade to large-v3 when blocking startup is fixed
@@ -30,6 +30,8 @@ whisper_model = whisper.load_model("tiny")
 
 # ── Admin auth ────────────────────────────────────────────────────────────────
 ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "")
+print(f"[config] ADMIN_API_KEY loaded: {bool(ADMIN_API_KEY)}")
+
 
 async def verify_admin_key(x_admin_key: str = Header(None)):
     if not ADMIN_API_KEY:
