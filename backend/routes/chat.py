@@ -25,7 +25,7 @@ import asyncio
 from datetime import datetime, timezone
 from ddgs import DDGS
 from routes.memory import search_memory, ingest_exchange, should_ingest, classify_memory, is_duplicate_memory, col_knowledge, col_facts, col_style, detect_memory_command, handle_memory_command, REMEMBER_PATTERNS, FORGET_PATTERNS
-from routes.context_builder import build_context, ContextResult
+from routes.context_builder import build_context, ContextResult, emit_context_log
 from routes.database import save_message, get_roleplay_session, upsert_roleplay_session
 from routes.config import OLLAMA_URL, MODEL_FAST, MODEL_DEEP, ANTHROPIC_API_KEY, CHAT_PROVIDER
 from sheets import get_menu_context
@@ -349,9 +349,19 @@ async def chat(req: ChatRequest):
     web        = await do_web_search(req.message) if did_search else ""
     _personal_signals = ["ptpreps", "my ", "i am", "i'm", "we ", "our ", "alex"]
     _has_personal      = any(s in req.message.lower() for s in _personal_signals)
-    ctx = await build_context(req.message) if (not did_search or _has_personal) else ContextResult()
+    ctx = await build_context(req.message) if (not did_search or _has_personal) else ContextResult(
+        tier1_status="empty_source",
+        tier2_status="empty_source",
+        tier1_char_count=0,
+        tier2_char_count=0,
+        tier2_result_count=0,
+    )
 
     sheets     = get_menu_context(req.message)
+
+    # STAB-001: emit structured context assembly log before prompt construction.
+    # Captures tier status, char counts, and context sources at inference time.
+    emit_context_log(ctx, "chat", web, sheets)
 
     messages = [{"role": "system", "content": build_system_prompt(ctx, web, sheets)}]
     messages += req.history

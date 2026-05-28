@@ -14,7 +14,10 @@ import chromadb
 from chromadb.utils import embedding_functions
 from dotenv import load_dotenv
 import os
+import logging
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 # ── Config ────────────────────────────────────────────────────────────────────
 CHROMA_PATH = os.getenv("CHROMA_PATH", "./chroma_db")

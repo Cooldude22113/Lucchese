@@ -7,10 +7,10 @@ Lucchese complexity is increasing faster than operational clarity.
 The current priority is reducing chaos and improving maintainability before expanding major capabilities.
 
 Current Objectives
-stabilize context assembly
-improve observability
+stabilize context assembly — observability deployed (STAB-001); token budget enforcement and chat.py decomposition ongoing
+improve observability — inference logging (STAB-001) and startup validation (STAB-005) deployed; retrieval inspection outstanding
 improve profile_state reliability
-improve startup reliability
+improve startup reliability — startup validation deployed (STAB-005); rollback discipline outstanding
 improve deployment discipline
 improve debugging clarity
 reduce hidden behavior
@@ -19,7 +19,7 @@ observability improvements
 logging improvements
 context inspection
 state hardening
-startup validation
+startup validation follow-up (TD-001 through TD-004 technical debt)
 rollback safety
 stabilization work
 production safety improvements

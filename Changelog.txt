@@ -1,3 +1,202 @@
+## STAB-001 — Context Assembly Observability
+Released: [27/05/26]
+Pipeline: Stabilize
+Specification: Architecture & Design (May 2026)
+Review: Passed after blocker remediation
+
+### What Changed
+
+context_builder.py
+  - ContextResult extended with 7 new fields: tier1_status, tier1_error_type,
+    tier1_char_count, tier2_status, tier2_error_type, tier2_char_count, tier2_result_count
+  - build_context() now sets tier status fields inside existing try/except blocks
+  - emit_context_log() added — structured JSON emission per inference
+  - EMPTY_CONTEXT singleton defaults updated; tier2_result_count carries binary
+    proxy semantics pending search_memory() interface change (STAB-005)
+
+chat.py
+  - emit_context_log() called immediately before build_system_prompt() on main path
+  - Web-search bypass now uses explicit ContextResult(tier1_status="empty_source",
+    tier2_status="empty_source") rather than bare ContextResult()
+  - Action plan and scrape intercepts unchanged — still produce no observability entries
+
+voice.py
+  - emit_context_log() called immediately before build_system_prompt()
+
+main.py
+  - lucchese.context logger configured with StreamHandler, propagate=False
+  - context_logging_initialized startup confirmation entry emitted on startup
+  - Timestamp capture fixed: datetime.now(timezone.utc) called once per entry
+
+### Operational Behavior After Deployment
+
+Every chat and voice inference on the main path produces one context_assembly INFO
+log entry in the lucchese.context stream. tier1_status will read "empty_source" on
+all inferences until profile_state is seeded (STAB-002). This is correct and expected.
+
+Tier retrieval failures produce context_tier_failure WARNING entries.
+
+### Known Limitations (deferred)
+
+tier2_result_count is a binary proxy (0 or 1), not an actual ChromaDB result count.
+Accurate count requires search_memory() interface change (tracked: STAB-005).
+
+Action plan and scrape intercept paths in chat.py produce no observability entries.
+Full resolution requires chat.py decomposition (AD-011). Minimal coverage tracked: STAB-006.
+
+Log rotation is not implemented. lucchese.context entries accumulate without bound.
+Must be addressed before sustained production use (tracked: STAB-003, P0).
+
+EMPTY_CONTEXT singleton is mutable. Tracked for resolution: STAB-004.
+
+### Follow-Up Tasks Created
+
+STAB-004 — ContextResult immutability (P1)
+STAB-005 — tier2_result_count accurate count, scoped with AD-015 (P2)
+STAB-006 — Intercept path minimal observability coverage (P2)
+STAB-007 — Logger handler documentation and test environment guidance (P2)
+STAB-008 — Spec document field name alignment (P3)
+
+## STAB-003 — Log Rotation and Retention Policy
+Released: [28/05/26]
+Pipeline: Stabilize
+Specification: Architecture & Design (May 2026)
+Review: Passed — no blockers
+
+### What Changed
+
+main.py
+  - RotatingFileHandler added to lucchese.context logger alongside existing StreamHandler
+  - Rotation parameters: maxBytes=5_242_880 (5 MB), backupCount=5
+  - Total disk cap: ~25 MB across active file plus 5 backups
+  - Both handlers share a single _PassthroughJsonFormatter instance
+  - log_rotation_initialized startup entry added — records max_bytes, backup_count,
+    and os.path.abspath(log_path) so actual write destination is visible in the log stream
+
+### Operational Behavior After Deployment
+
+lucchese.context log entries are now written to lucchese.context.log on disk.
+Rotation fires when the active file exceeds 5 MB. Backup files are named
+lucchese.context.log.1 through .5. Oldest backup is discarded when the cap is reached.
+Console output (StreamHandler) is unchanged from STAB-001.
+log_rotation_initialized appears in the startup sequence after context_logging_initialized.
+
+### Known Limitations
+
+Log file path is relative — resolved against process working directory at startup,
+not main.py directory. Actual path is emitted in log_rotation_initialized for
+discoverability. Risk is low in current single-machine environment but increases
+under process supervision changes or containerization. Tracked: STAB-003-FU-01.
+
+No OSError guard on RotatingFileHandler instantiation. If the log path becomes
+non-writable at startup, the entire process will fail to start. Loud failure, not
+silent — acceptable for now. Tracked: STAB-003-FU-02.
+
+Rotation events are silent — no log entry is produced when a backup file is created.
+Disk state must be checked directly if rotation history is needed.
+
+### Follow-Up Tasks Created
+
+STAB-003-FU-01 — Anchor log path to main.py directory (Medium, pre-containerization)
+STAB-003-FU-02 — OSError guard on RotatingFileHandler instantiation (Low)
+
+## STAB-005 — Startup Validation and State Layer Lifecycle Integrity
+Released: [28/05/26]
+Pipeline: Stabilize
+Specification: Architecture & Design (May 2026)
+Review: Passed after blocker remediation (one blocker resolved before ship)
+
+### What Changed
+
+routes/startup_validator.py (new file)
+  - run_startup_validation() — orchestrates all checks in sequence, enforces failure policy
+  - check_environment() — validates all env vars against config.py audit; hard-stop on
+    invalid CHAT_PROVIDER value or absent provider-specific credential (e.g. ANTHROPIC_API_KEY
+    when CHAT_PROVIDER=claude); warning on defaulted vars; warning on optional vars
+  - check_sqlite_connectivity() — read-only URI mode connection probe; hard-stop on failure
+  - check_required_tables() — PRAGMA table_list against CANONICAL_STATE_SCHEMA and
+    CANONICAL_CONVERSATION_SCHEMA; hard-stop on missing table
+  - check_state_schema() — PRAGMA table_info per table; hard-stop on missing expected column;
+    warning on extra columns beyond canonical list
+  - check_profile_state_row() — confirms profile_state row exists and confirmed=1;
+    warning (not hard-stop) if absent or unconfirmed — surfaces Tier 1 empty state at startup
+  - check_chromadb_connectivity() — threaded probe with 5s timeout; degraded-start (not
+    hard-stop) if unreachable; inference-time signals handle the downstream effect
+  - StartupValidationResult dataclass — aggregate of all CheckResult entries with
+    overall_status, should_abort, degraded_components, failed_components, warning_components
+  - lucchese.startup structured logger configured with StreamHandler and
+    _PassthroughJsonFormatter — same pattern as lucchese.context (STAB-001 / STAB-003)
+  - CANONICAL_STATE_SCHEMA and CANONICAL_CONVERSATION_SCHEMA hardcoded and must be kept
+    in sync with routes/state.py and routes/database.py respectively (maintenance obligation)
+
+main.py
+  - from routes.startup_validator import run_startup_validation added
+  - run_startup_validation() called after init_db() and init_state_db(), before any
+    app.include_router() call
+
+### Blocker Resolved During Review
+
+profile_schema_ok gate condition used status == "ok" only. Extra columns in profile_state
+(e.g. from apply_migrations()) produce status == "warning", causing the gate to evaluate
+False and silently suppress the not_seeded Tier 1 warning — the validator's most
+operationally important output. Fixed to status in ("ok", "warning") before ship.
+
+### Operational Behavior After Deployment
+
+Every process start produces a startup_validation_begin entry, one startup_check entry
+per dependency checked, and a startup_validation_complete aggregate entry in the
+lucchese.startup stream.
+
+Hard-stop conditions (sys.exit(1)): invalid CHAT_PROVIDER value, absent provider-required
+API key, SQLite connectivity failure, missing required table, missing expected column.
+
+Degraded-start conditions (server continues, warning emitted): ChromaDB unreachable or
+timeout. Inference-time memory failures will surface via STAB-001 tier signals.
+
+Warning conditions (non-blocking): defaulted env vars, optional env vars absent, extra
+schema columns, profile_state row absent or unconfirmed.
+
+profile_state not_seeded warning will fire on every startup until STAB-002 ships.
+This is expected and correct — it surfaces the Tier 1 empty state that STAB-001 surfaces
+at inference time.
+
+AD-013 satisfied. AD-012 partially satisfied — retrieval inspection output remains.
+
+### Known Limitations (Standing Technical Debt)
+
+TD-001 — _PassthroughJsonFormatter duplicated across startup_validator.py and main.py.
+  Format divergence between lucchese.startup and lucchese.context is a silent maintenance
+  risk. Resolve before any log parsing tooling is built. Tracked.
+
+TD-002 — check_required_tables and check_state_schema open read-write connections.
+  Inconsistent with the module's stated read-only contract and with check_sqlite_connectivity
+  URI mode. One-line fix per function. Batch with TD-003. Tracked.
+
+TD-003 — check_state_schema conn.close() not in a finally block.
+  Connection leak risk on uncaught exception outside the per-table loop. Startup-only path;
+  bounded risk. Batch with TD-002. Tracked.
+
+TD-004 — lucchese.startup logger has no file handler.
+  Startup failures leave no disk trace if process manager does not capture stdout.
+  Resolve TD-001 first, then add RotatingFileHandler. Must resolve before any unattended
+  deployment scenario. Tracked.
+
+### CANONICAL_STATE_SCHEMA Maintenance Obligation
+
+CANONICAL_STATE_SCHEMA in startup_validator.py must be updated whenever init_state_db()
+or apply_migrations() in routes/state.py changes the schema. Failure to do so will
+produce schema warnings on every startup for unrecognized columns, or false hard-stops
+if expected columns are removed. This obligation is documented in the module docstring.
+
+### Follow-Up Tasks Created
+
+TD-001 — _PassthroughJsonFormatter deduplication (Low, before log tooling)
+TD-002 — Read-only connection mode enforcement in schema checks (Low, batch with TD-003)
+TD-003 — finally block for check_state_schema connection (Low, batch with TD-002)
+TD-004 — File handler for lucchese.startup logger (Medium, before unattended deploy)
+
+________
+TEMPLATE
 Format
 Date
 Added
