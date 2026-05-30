@@ -15,7 +15,9 @@ function useStats() {
 
   useEffect(() => {
     Promise.all([
-      fetch(`${API}/admin/stats`).then(r => r.json()).catch(() => null),
+      fetch(`${API}/admin/stats`, {
+        headers: { "x-admin-key": import.meta.env.VITE_ADMIN_KEY }
+      }).then(r => r.json()).catch(() => null),
       fetch(`${API}/conversations`).then(r => r.json()).catch(() => []),
       fetch(`${API}/documents`).then(r => r.json()).catch(() => []),
     ]).then(([s, c, d]) => {
