@@ -37,14 +37,12 @@ from routes.scrape import detect_scrape_command, scrape_and_review
 router = APIRouter()
 
 
-# ── Request model ─────────────────────────────────────────────────────────────
 class ChatRequest(BaseModel):
     message:         str
     history:         Optional[list] = []
     conversation_id: Optional[str]  = None
     deep:            Optional[bool] = False
 
-# ── Web search ────────────────────────────────────────────────────────────────
 WEB_TRIGGERS = [
     r"\b(latest|recent|current news|today|tonight)\b",
     r"\b(news|weather|score|results?|standings?)\b",
@@ -86,7 +84,6 @@ async def do_web_search(query: str, max_results: int = 4) -> str:
         return ""
 
 
-# ── System prompt builder ─────────────────────────────────────────────────────
 def build_system_prompt(ctx: ContextResult | None, web_context: str, sheets_context: str = "") -> str:
     """
     Assemble the full system prompt from a ContextResult and optional live data.
@@ -183,7 +180,6 @@ Use this data to inform your response. For website reviews, analyse what the sea
     return "\n\n".join(sections)
 
 
-# ── Chat endpoint ─────────────────────────────────────────────────────────────
 @router.post("/chat")
 async def chat(req: ChatRequest):
     conversation_id = req.conversation_id or str(uuid.uuid4())
@@ -195,7 +191,6 @@ async def chat(req: ChatRequest):
             yield json.dumps({"type": "done",  "auto_ingested": auto_ingested}) + "\n"
         return StreamingResponse(generator(), media_type="application/x-ndjson")
 
-    # ── Shopify command intercept ─────────────────────────────────────────────
     shopify_match = re.search(r'shopify add (.+)|add (.+) to shopify', req.message.lower())
     if shopify_match:
         meal_name = (shopify_match.group(1) or shopify_match.group(2)).strip()
@@ -206,7 +201,6 @@ async def chat(req: ChatRequest):
         )
         return stream_plain_reply(reply)
 
-    # ── Memory command intercept ──────────────────────────────────────────────
     command, content = detect_memory_command(req.message)
     if command:
         reply = await handle_memory_command(command, content, conversation_id)
@@ -214,7 +208,6 @@ async def chat(req: ChatRequest):
         save_message(conversation_id, "assistant", reply)
         return stream_plain_reply(reply, auto_ingested=command == "remember")
 
-    # ── Deal analysis intercept ───────────────────────────────────────────────
     if req.message.lower().startswith(("analyse deal:", "analyze deal:")):
         from routes.deal import analyse_deal
         reply = analyse_deal(req.message)
@@ -222,7 +215,6 @@ async def chat(req: ChatRequest):
         save_message(conversation_id, "assistant", reply)
         return stream_plain_reply(reply)
 
-    # ── Roleplay intercept — delegates entirely to routes/roleplay.py ─────────
     msg_lower          = req.message.lower().strip()
     is_active_roleplay = get_roleplay_session(conversation_id) is not None
     starts_roleplay    = any(x in msg_lower for x in [
@@ -237,9 +229,7 @@ async def chat(req: ChatRequest):
         save_message(conversation_id, "assistant", reply)
         return stream_plain_reply(reply)
 
-    # ── Action plan intercept ─────────────────────────────────────────────────────
     if req.message.lower().strip() in ["action plan", "action plan.", "action plan!"]:
-        # Pull the last website review from memory
         recent = await search_memory("website review ptpreps")
         action_prompt = f"""Based on this website review:
 
@@ -291,7 +281,6 @@ async def chat(req: ChatRequest):
             yield json.dumps({"type": "done", "auto_ingested": False}) + "\n"
         return StreamingResponse(action_stream(), media_type="application/x-ndjson")
 
-    # ── Scrape intercept ──────────────────────────────────────────────────────────
     scrape_url = detect_scrape_command(req.message)
     if scrape_url:
         save_message(conversation_id, "user", req.message)
@@ -299,7 +288,6 @@ async def chat(req: ChatRequest):
         if review_prompt.startswith("Couldn't") or review_prompt.startswith("Failed"):
             save_message(conversation_id, "assistant", review_prompt)
             return stream_plain_reply(review_prompt)
-        # Send scrape content to LLM for review
         scrape_messages = [
             {"role": "system", "content": build_system_prompt(None, "", "")},
             {"role": "user", "content": review_prompt}
@@ -344,7 +332,6 @@ async def chat(req: ChatRequest):
             yield json.dumps({"type": "done", "auto_ingested": True}) + "\n"
         return StreamingResponse(scrape_stream(), media_type="application/x-ndjson")
 
-    # ── Normal chat flow ──────────────────────────────────────────────────────
     did_search = needs_web_search(req.message)
     web        = await do_web_search(req.message) if did_search else ""
     _personal_signals = ["ptpreps", "my ", "i am", "i'm", "we ", "our ", "alex"]
@@ -359,8 +346,6 @@ async def chat(req: ChatRequest):
 
     sheets     = get_menu_context(req.message)
 
-    # STAB-001: emit structured context assembly log before prompt construction.
-    # Captures tier status, char counts, and context sources at inference time.
     emit_context_log(ctx, "chat", web, sheets)
 
     messages = [{"role": "system", "content": build_system_prompt(ctx, web, sheets)}]
@@ -405,7 +390,6 @@ async def chat(req: ChatRequest):
                 yield json.dumps({"type": "token", "content": reply_text}) + "\n"
 
             else:
-                # Ollama — true token streaming
                 async with httpx.AsyncClient(timeout=300) as client:
                     async with client.stream("POST", OLLAMA_URL, json={
                         "model":    MODEL_DEEP if req.deep else MODEL_FAST,
@@ -430,7 +414,6 @@ async def chat(req: ChatRequest):
             print(f"stream_response error ({CHAT_PROVIDER}): {e}")
             yield json.dumps({"type": "token", "content": "\n\n[Response error — please try again]"}) + "\n"
 
-        # ── Post-processing ───────────────────────────────────────────────────
         reply = "".join(full_reply)
         if reply:
             save_message(conversation_id, "assistant", reply)

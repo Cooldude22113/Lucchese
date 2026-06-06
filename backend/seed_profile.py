@@ -35,8 +35,8 @@ FIELD TYPES:
     current_priorities, focus_area
 
   Manual fields — no extraction attempted; human fills confirmed_value directly:
-    active_course, course_status, system_goal, memory_status,
-    historical_context, personality_mode
+    active_course, course_status,
+    historical_context,
 """
 
 import json
@@ -125,10 +125,7 @@ EXTRACTABLE_FIELDS: list[str] = [
 MANUAL_FIELDS: list[str] = [
     "active_course",
     "course_status",
-    "system_goal",
-    "memory_status",
     "historical_context",
-    "personality_mode",
 ]
 
 # All fields known to this pipeline. Used for apply-mode validation.
@@ -231,17 +228,8 @@ MANUAL_FIELD_CONFIG: dict[str, dict] = {
     "course_status": {
         "ttl_days": 14,
     },
-    "system_goal": {
-        "ttl_days": 180,
-    },
-    "memory_status": {
-        "ttl_days": 7,
-    },
     "historical_context": {
         "ttl_days": 365,
-    },
-    "personality_mode": {
-        "ttl_days": 90,
     },
 }
 
@@ -294,10 +282,7 @@ FIELD_DEFINITIONS: dict[str, tuple[str, str]] = {
 MANUAL_FIELD_DESCRIPTIONS: dict[str, str] = {
     "active_course":     "The name or description of a course Alex is currently enrolled in or studying.",
     "course_status":     "Where Alex currently is in an active course — week number, module, percentage complete.",
-    "system_goal":       "The overarching goal or directive of the Lucchese system for Alex.",
-    "memory_status":     "Current state of Alex's memory system — what is populated, pending, or degraded.",
     "historical_context":"Stable background context about Alex that rarely changes.",
-    "personality_mode":  "The personality or interaction mode currently configured for Alex.",
 }
 
 # Updated extraction prompt: adds temporal_frame to the response schema.

@@ -59,13 +59,11 @@ from chromadb.utils import embedding_functions
 from dotenv import load_dotenv
 load_dotenv()
 
-# ── Config ────────────────────────────────────────────────────────────────────
-CHROMA_PATH  = "./chroma_db"
-EMBED_MODEL  = "nomic-ai/nomic-embed-text-v1"
-CHUNK_SIZE   = 800
-CHUNK_OVERLAP = 100
-BATCH_SIZE   = 10
-CONCURRENCY  = 4
++ # ── Config ────────────────────────────────────────────────────────────────────
++ # Constants are defined in pipeline/shared.py and imported below.
++ # Local overrides: set these here if this script needs different values.
+BATCH_SIZE  = 10
+CONCURRENCY = 4
 
 OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434") + "/api/chat"
 MODEL      = os.getenv("MODEL_FAST", "gemma2:27b")
@@ -88,42 +86,27 @@ _all_dedup_distances: list[float] = []
 # One lock for all collections — conservative but correct at CONCURRENCY=4.
 _chroma_lock = threading.Lock()
 
-# ── Era boundaries ────────────────────────────────────────────────────────────
-ERA_BOUNDARIES = [
-    (None, 2013, "pre_divorce"),    # before parents split
-    (2013, 2020, "post_divorce"),   # post-divorce to epilepsy diagnosis
-    (2020, 2022, "transition"),     # diagnosis + adjustment
-    (2022, 2024, "building"),       # PTPreps, Lucchese, current projects
-    (2024, None, "present"),
-]
-
-ERA_DESCRIPTIONS = {
-    "pre_divorce":  "Before parents divorced (~2013). Earlier life period.",
-    "post_divorce": "Post-divorce to epilepsy diagnosis (2013–2020).",
-    "transition":   "Epilepsy diagnosis and adjustment period (2020–2022).",
-    "building":     "PTPreps, Lucchese, and current projects emerging (2022–2024).",
-    "present":      "Current period (2024+).",
-}
-
-def get_era_from_year(year: int) -> str:
-    for start, end, label in ERA_BOUNDARIES:
-        if (start is None or year >= start) and (end is None or year < end):
-            return label
-    return "present"
-
++ # ── Shared imports ────────────────────────────────────────────────────────────
+from pipeline.shared import (
+    CHROMA_PATH,
+    EMBED_MODEL,
+    CHUNK_SIZE,
+    CHUNK_OVERLAP,
+    chunk_text,
+    safe_json,
+    llm_call as _shared_llm_call,
+    ERA_BOUNDARIES,
+    get_era_from_year,
+    TEMPORAL_SIGNALS,
+    ERA_PROMPT,
+    extract_era_mention as _shared_extract_era,
+    make_logger,
+    sample_pairs_for_summary,
+)
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 _log_path = Path(f"ingest_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
-_file_handler    = logging.FileHandler(_log_path, encoding="utf-8")
-_console_handler = logging.StreamHandler()
-_file_handler.setLevel(logging.DEBUG)
-_file_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
-_console_handler.setLevel(logging.WARNING)
-_console_handler.setFormatter(logging.Formatter("[%(levelname)s] %(message)s"))
-log = logging.getLogger("lucchese_ingest")
-log.setLevel(logging.DEBUG)
-log.addHandler(_file_handler)
-log.addHandler(_console_handler)
+log = make_logger("lucchese_ingest", _log_path)
 
 
 # ── ChromaDB setup ────────────────────────────────────────────────────────────
@@ -134,47 +117,8 @@ def get_collections():
     )
     client        = chromadb.PersistentClient(path=CHROMA_PATH)
     col_knowledge = client.get_or_create_collection("knowledge",  embedding_function=ef)
-    col_summaries = client.get_or_create_collection("summaries",  embedding_function=ef)
-    # facts and style are NOT written at ingest time — populated by reclassify.py
-    return client, ef, col_knowledge, col_summaries
-
-
-# ── Text chunking (proper sliding window overlap) ─────────────────────────────
-def chunk_text(text: str, size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list[str]:
-    sentences = re.split(r'(?<=[.!?])\s+', text.strip())
-    chunks    = []
-    current   = ""
-
-    for sentence in sentences:
-        if len(sentence) > size:
-            if current:
-                chunks.append(current)
-                current = ""
-            for i in range(0, len(sentence), size - overlap):
-                part = sentence[i:i + size]
-                if part.strip():
-                    chunks.append(part.strip())
-            continue
-
-        if len(current) + len(sentence) + 1 <= size:
-            current = (current + " " + sentence).strip()
-        else:
-            if current:
-                chunks.append(current)
-                overlap_seed = current[-overlap:].strip()
-                seeded = (overlap_seed + " " + sentence).strip()
-                # bounds check: seeded chunk must not exceed size
-                current = seeded if len(seeded) <= size else sentence
-            else:
-                current = sentence
-
-    if current:
-        chunk_hash = hashlib.md5(current.encode()).hexdigest()
-        existing_hashes = {hashlib.md5(c.encode()).hexdigest() for c in chunks}
-        if chunk_hash not in existing_hashes:
-            chunks.append(current)
-
-    return [c for c in chunks if len(c.strip()) > 20]
+    # facts, style, and summaries are NOT written at ingest time
+    return client, ef, col_knowledge
 
 
 # ── Timestamp helpers ─────────────────────────────────────────────────────────
@@ -384,105 +328,12 @@ def noise_filter(conv: dict, pairs: list) -> tuple[bool, str]:
 _semaphore: asyncio.Semaphore | None = None
 
 async def llm_call(client: httpx.AsyncClient, prompt: str, max_tokens: int = 100) -> str:
+    """Wrapper: passes module semaphore/url/model to shared llm_call."""
     assert _semaphore is not None, "semaphore not initialised"
-    async with _semaphore:
-        for attempt in range(3):
-            try:
-                res = await client.post(
-                    OLLAMA_URL,
-                    json={
-                        "model":    MODEL,
-                        "messages": [{"role": "user", "content": prompt}],
-                        "stream":   False,
-                        "options":  {"temperature": 0, "num_predict": max_tokens},
-                    },
-                    timeout=90,
-                )
-                return res.json()["message"]["content"].strip()
-            except Exception as e:
-                log.warning(f"LLM attempt {attempt+1}/3 failed: {e}")
-                if attempt < 2:
-                    await asyncio.sleep(2 ** attempt)
+    result = await _shared_llm_call(client, prompt, max_tokens, _semaphore, OLLAMA_URL, MODEL)
+    if not result:
         log.error("LLM call failed after 3 attempts")
-        return ""
-
-def safe_json(text: str) -> dict:
-    """
-    Parse JSON from LLM response.
-    Handles Gemma preamble pattern: "Sure! Here's the JSON: {...}"
-    Strips markdown fences. Falls back to regex extraction.
-    """
-    try:
-        clean = re.sub(r"```json|```", "", text).strip()
-        clean = re.sub(r",\s*([}\]])", r"\1", clean)
-        return json.loads(clean)
-    except Exception:
-        pass
-    # Gemma preamble fallback — extract first {...} block
-    try:
-        match = re.search(r'\{.*\}', text, re.DOTALL)
-        if match:
-            clean = re.sub(r",\s*([}\]])", r"\1", match.group(0))
-            return json.loads(clean)
-    except Exception:
-        pass
-    log.warning(f"safe_json: parse failure — raw: '{text[:120]}'")
-    return {}
-
-
-# ── Era extraction ────────────────────────────────────────────────────────────
-TEMPORAL_SIGNALS = [
-    "years ago", "back in", "when i was",
-    "a few years", "decade ago",
-    "growing up", "as a kid", "as a child",
-    "in the past", "back then",
-]
-
-ERA_PROMPT = """Does this text reference a specific time period or relative time?
-Examples: "10 years ago", "back in 2019", "when I was younger"
-
-Text: {text}
-
-Reply with JSON only:
-{{"has_time_ref": true, "approximate_year": 2015}}
-or
-{{"has_time_ref": false, "approximate_year": null}}"""
-
-async def extract_era_mention(client: httpx.AsyncClient, pairs: list) -> tuple[bool, int | None]:
-    """
-    Scans ALL user messages (not just first 5 — previous bug).
-    Regex-gated: fires LLM only if temporal signal found.
-    Windows around match position for context (not truncated from position 0).
-    """
-    all_user_text = " ".join(p["user_text"] for p in pairs)
-    t = all_user_text.lower()
-
-    match_pos = -1
-    for sig in TEMPORAL_SIGNALS:
-        idx = t.find(sig)
-        if idx != -1 and (match_pos == -1 or idx < match_pos):
-            match_pos = idx
-
-    if match_pos == -1:
-        return False, None
-
-    window_start = max(0, match_pos - 200)
-    text_window  = all_user_text[window_start:window_start + 1000]
-
-    prompt   = ERA_PROMPT.format(text=text_window)
-    response = await llm_call(client, prompt, max_tokens=40)
-    result   = safe_json(response)
-
-    has_ref = result.get("has_time_ref", False)
-    year    = result.get("approximate_year", None)
-
-    if isinstance(year, int) and 1980 <= year <= datetime.now().year:
-        return has_ref, year
-
-    # Fix: if year extraction failed, has_ref must also be False
-    # prevents has_era_mention=true with referenced_era="" contradiction
-    return False, None
-
+    return result
 
 # ── Conversation summary ──────────────────────────────────────────────────────
 SUMMARY_PROMPT = """Write one sentence describing this conversation and what it reveals about Alex.
@@ -496,67 +347,6 @@ Exchanges ({n} total — weighted toward the final exchanges where positions dev
 {sample}
 
 One sentence only:"""
-
-def _sample_for_summary(pairs: list, max_samples: int = 6) -> list:
-    """
-    Weight toward final third of conversation — that's where Alex's actual
-    positions tend to land after a long exchange, not the opening questions.
-    """
-    n = len(pairs)
-    if n <= max_samples:
-        return pairs
-
-    # 1 from start, 1 from mid, 4 from final third
-    indices = [0]
-    mid = n // 2
-    indices.append(mid)
-    final_third_start = max(mid + 1, n - 4)
-    indices += list(range(final_third_start, n))
-
-    seen   = set()
-    result = []
-    for idx in indices:
-        if idx not in seen and 0 <= idx < n:
-            seen.add(idx)
-            result.append(idx)
-        if len(result) >= max_samples:
-            break
-
-    return [pairs[i] for i in sorted(result)]
-
-async def generate_summary(
-    client: httpx.AsyncClient,
-    conv_id: str,
-    title: str,
-    pairs: list,
-    col_summaries,
-) -> str:
-    sampled = _sample_for_summary(pairs)
-    sample  = "\n".join([
-        f"[Alex]: {p['user_text'][:200]}\n[ChatGPT]: {p['assistant_text'][:100]}"
-        for p in sampled
-    ])
-    prompt  = SUMMARY_PROMPT.format(title=title, n=len(pairs), sample=sample)
-    summary = (await llm_call(client, prompt, max_tokens=80)).strip()
-
-    if summary:
-        # asyncio.to_thread for synchronous ChromaDB write
-        def _upsert():
-            with _chroma_lock:
-                col_summaries.upsert(
-                    ids       = [f"conv_summary_{conv_id}"],
-                    documents = [summary],
-                    metadatas = [{
-                        "source":  "chatgpt",
-                        "conv_id": conv_id,
-                        "title":   title,
-                        "type":    "conv_summary",
-                    }],
-                )
-        await asyncio.to_thread(_upsert)
-        log.debug(f"SUMMARY [{conv_id}]: {summary[:80]}")
-
-    return summary
 
 
 # ── Dedup — distance logging only ────────────────────────────────────────────
@@ -596,7 +386,6 @@ async def process_conversation(
     conv: dict,
     client: httpx.AsyncClient,
     col_knowledge,
-    col_summaries,
     stats: dict,
     increment_stat,
 ) -> None:
@@ -630,17 +419,11 @@ async def process_conversation(
     conv_year = year_from_iso(created) if created else datetime.now().year
     conv_era  = get_era_from_year(conv_year)
 
-    # Run era extraction and summary concurrently — independent operations
-    (has_era_ref, ref_year), conv_summary = await asyncio.gather(
-        extract_era_mention(client, pairs),
-        generate_summary(client, conv_id, title, pairs, col_summaries),
-    )
-
-    # Fix: if ref_year is None, has_era_ref must be False
-    # Prevents has_era_mention=true with referenced_era="" contradiction
-    if ref_year is None:
-        has_era_ref  = False
-    referenced_era = get_era_from_year(ref_year) if ref_year else ""
+    # Era extraction deferred — see LC-043 spec "Era Extraction — Disposition"
+    # has_era_mention and referenced_era ship as "unclassified" until a dedicated
+    # stage is specified. extract_era_mention is preserved in pipeline/shared.py.
+    has_era_ref    = False
+    referenced_era = ""
 
     print(f"  ✓ [{title[:55]}] {conv_era}")
     log.info(f"PROCESSING [{conv_id}] title='{title}' era={conv_era} pairs={len(pairs)}")
@@ -690,7 +473,7 @@ async def process_conversation(
             "pair_idx":           str(j),
             "has_era_mention":    str(has_era_ref).lower(),
             "referenced_era":     referenced_era,
-            "conv_summary":       conv_summary[:200] if conv_summary else "",
+            "conv_summary":       "",
             "user_text_raw":      user_text,          # clean user text — serving layer reads this
             "assistant_excerpt":  assistant_excerpt,   # preamble-stripped, 600 chars
             "assistant_length":   assistant_length,    # full response length for reference
@@ -732,17 +515,18 @@ async def process_conversation(
 
 
 # ── Wipe ──────────────────────────────────────────────────────────────────────
-def wipe_chatgpt_entries(col_knowledge, col_summaries, checkpoint_path: Path):
+def wipe_chatgpt_entries(col_knowledge, checkpoint_path: Path):
     """
     Wipes all chatgpt-sourced entries from ChromaDB.
-    Also clears checkpoint file — previous versions left this intact,
+    Summaries are now managed by generate_summaries.py -- not wiped here.
+    Also clears checkpoint file ...
     causing all conversations to be skipped on the next run (empty database bug).
     """
     print("Wiping existing ChatGPT entries...")
     FETCH_SIZE   = 500
     max_iters    = 200  # guard against infinite loop on buggy ChromaDB versions
 
-    for col in [col_knowledge, col_summaries]:
+    for col in [col_knowledge]:
         try:
             all_ids = []
             offset  = 0
@@ -843,7 +627,7 @@ async def main():
 
         if args.wipe:
             # Wipe clears checkpoint too — critical fix
-            wipe_chatgpt_entries(col_knowledge, col_summaries, checkpoint_path)
+            wipe_chatgpt_entries(col_knowledge, checkpoint_path)
             print()
 
         # Load checkpoint
@@ -894,7 +678,7 @@ async def main():
         async def _process_with_checkpoint(conv):
             try:
                 await process_conversation(
-                    conv, client, col_knowledge, col_summaries, stats, increment_stat,
+                    conv, client, col_knowledge, stats, increment_stat,
                 )
             except Exception as e:
                 import traceback

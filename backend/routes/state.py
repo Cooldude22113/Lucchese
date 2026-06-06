@@ -57,10 +57,7 @@ def apply_migrations(conn):
         "current_business": "TEXT",
         "training_focus": "TEXT",
         "current_priorities": "TEXT",
-        "system_goal": "TEXT",
-        "memory_status": "TEXT",
         "historical_context": "TEXT",
-        "personality_mode": "TEXT",
     }
     for name, col_type in new_columns.items():
         if name not in existing_columns:
@@ -142,10 +139,7 @@ def init_state_db():
             current_business    TEXT,
             training_focus      TEXT,
             current_priorities  TEXT,
-            system_goal         TEXT,
-            memory_status       TEXT,
             historical_context  TEXT,
-            personality_mode    TEXT,
             focus_area       TEXT,
             confirmed        INTEGER NOT NULL DEFAULT 0,
             field_meta       TEXT,
@@ -200,10 +194,7 @@ class ProfileIn(BaseModel):
     current_business: str | None = None
     training_focus: str | None = None
     current_priorities: str | None = None
-    system_goal: str | None = None
-    memory_status: str | None = None
     historical_context: str | None = None
-    personality_mode: str | None = None
     confirmed:       bool | None = None
     field_meta:      dict | None = None  # per-field provenance; merged, not replaced
     clear_fields:    list[str]   = []
@@ -360,10 +351,7 @@ def upsert_profile(item: ProfileIn):
         merged_current_business = item.current_business if item.current_business is not None else existing.get("current_business")
         merged_training_focus = item.training_focus if item.training_focus is not None else existing.get("training_focus")
         merged_current_priorities = item.current_priorities if item.current_priorities is not None else existing.get("current_priorities")
-        merged_system_goal = item.system_goal if item.system_goal is not None else existing.get("system_goal")
-        merged_memory_status = item.memory_status if item.memory_status is not None else existing.get("memory_status")
         merged_historical_context = item.historical_context if item.historical_context is not None else existing.get("historical_context")
-        merged_personality_mode = item.personality_mode if item.personality_mode is not None else existing.get("personality_mode")
 
         # confirmed: None means preserve existing value
         if item.confirmed is not None:
@@ -377,8 +365,7 @@ def upsert_profile(item: ProfileIn):
         CLEARABLE = {
             "age", "active_course", "course_status", "primary_project",
             "focus_area", "active_projects", "current_business", "training_focus",
-            "current_priorities", "system_goal", "memory_status",
-            "historical_context", "personality_mode",
+            "current_priorities", "historical_context",
         }
         for fname in item.clear_fields:
             if fname in CLEARABLE:
@@ -388,8 +375,7 @@ def upsert_profile(item: ProfileIn):
             INSERT OR REPLACE INTO profile_state
                 (id, age, active_course, course_status, primary_project, focus_area,
                 active_projects, current_business, training_focus, current_priorities,
-                system_goal, memory_status, historical_context, personality_mode,
-                confirmed, field_meta, updated_at)
+                historical_context, confirmed, field_meta, updated_at)
             VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
@@ -402,10 +388,7 @@ def upsert_profile(item: ProfileIn):
                 merged_current_business,
                 merged_training_focus,
                 merged_current_priorities,
-                merged_system_goal,
-                merged_memory_status,
                 merged_historical_context,
-                merged_personality_mode,
                 merged_confirmed,
                 merged_field_meta,
                 now(),
