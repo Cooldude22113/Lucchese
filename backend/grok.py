@@ -54,8 +54,8 @@ MODEL      = os.getenv("MODEL_FAST", "gemma2:27b")
 _all_dedup_distances: list[float] = []
 _chroma_lock = threading.Lock()
 
-+ # ── Shared imports ────────────────────────────────────────────────────────────
-+ from pipeline.shared import (
+ # ── Shared imports ────────────────────────────────────────────────────────────
+ from pipeline.shared import (
     CHROMA_PATH,
     EMBED_MODEL,
     CHUNK_SIZE,

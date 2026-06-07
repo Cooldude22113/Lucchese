@@ -86,7 +86,7 @@ _all_dedup_distances: list[float] = []
 # One lock for all collections — conservative but correct at CONCURRENCY=4.
 _chroma_lock = threading.Lock()
 
-+ # ── Shared imports ────────────────────────────────────────────────────────────
+ # ── Shared imports ────────────────────────────────────────────────────────────
 from pipeline.shared import (
     CHROMA_PATH,
     EMBED_MODEL,

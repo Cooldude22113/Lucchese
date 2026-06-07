@@ -513,7 +513,7 @@ async def main():
             print("✗ Ollama unreachable")
             return
 
-        +         # Set JSONL output path before any processing begins.
+                 # Set JSONL output path before any processing begins.
         # If the file cannot be created, abort before classifying anything.
         global _jsonl_path
         _jsonl_path = Path(f"classifications_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jsonl")
