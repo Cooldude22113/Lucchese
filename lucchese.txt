@@ -1,0 +1,634 @@
+lucchese/
+│
+├── README.md
+├── .gitignore
+├── .env.example
+├── docker-compose.yml
+├── docs/
+│   ├── architecture.md
+│   ├── purpose_map.md
+│   ├── backend_flow.md
+│   ├── frontend_flow.md
+│   ├── memory_system.md
+│   ├── ingestion_pipeline.md
+│   ├── logging.md
+│   ├── deployment.md
+│   ├── refactor_plan.md
+│   └── changelog.md
+│
+├── backend/
+│   ├── main.py
+│   │
+│   ├── app/
+│   │   ├── factory.py
+│   │   ├── lifecycle.py
+│   │   ├── router.py
+│   │   └── dependencies.py
+│   │
+│   ├── config/
+│   │   ├── settings.py
+│   │   ├── paths.py
+│   │   ├── environment.py
+│   │   ├── model_settings.py
+│   │   ├── memory_settings.py
+│   │   ├── integration_settings.py
+│   │   ├── security_settings.py
+│   │   ├── logging_settings.py
+│   │   └── feature_flags.py
+│   │
+│   ├── api/
+│   │   ├── routes/
+│   │   │   ├── chat_routes.py
+│   │   │   ├── conversation_routes.py
+│   │   │   ├── memory_routes.py
+│   │   │   ├── document_routes.py
+│   │   │   ├── upload_routes.py
+│   │   │   ├── voice_routes.py
+│   │   │   ├── state_routes.py
+│   │   │   ├── business_routes.py
+│   │   │   ├── web_routes.py
+│   │   │   ├── admin_routes.py
+│   │   │   ├── debug_routes.py
+│   │   │   ├── log_routes.py
+│   │   │   └── health_routes.py
+│   │   │
+│   │   ├── schemas/
+│   │   │   ├── chat.py
+│   │   │   ├── conversations.py
+│   │   │   ├── memory.py
+│   │   │   ├── documents.py
+│   │   │   ├── uploads.py
+│   │   │   ├── voice.py
+│   │   │   ├── state.py
+│   │   │   ├── business.py
+│   │   │   ├── admin.py
+│   │   │   ├── logs.py
+│   │   │   └── common.py
+│   │   │
+│   │   ├── middleware/
+│   │   │   ├── cors.py
+│   │   │   ├── request_logger.py
+│   │   │   ├── error_handler.py
+│   │   │   ├── timing.py
+│   │   │   └── request_id.py
+│   │   │
+│   │   └── responses/
+│   │       ├── success.py
+│   │       ├── errors.py
+│   │       └── streaming.py
+│   │
+│   ├── application/
+│   │   ├── orchestration/
+│   │   │   ├── chat_flow.py
+│   │   │   ├── voice_flow.py
+│   │   │   ├── document_flow.py
+│   │   │   ├── import_flow.py
+│   │   │   ├── feedback_flow.py
+│   │   │   ├── business_flow.py
+│   │   │   └── admin_flow.py
+│   │   │
+│   │   ├── commands/
+│   │   │   ├── command_detector.py
+│   │   │   ├── memory_commands.py
+│   │   │   ├── document_commands.py
+│   │   │   ├── scrape_commands.py
+│   │   │   ├── business_commands.py
+│   │   │   └── roleplay_commands.py
+│   │   │
+│   │   └── services/
+│   │       ├── response_service.py
+│   │       ├── conversation_service.py
+│   │       ├── feedback_service.py
+│   │       ├── memory_service.py
+│   │       ├── upload_service.py
+│   │       ├── document_service.py
+│   │       ├── import_service.py
+│   │       ├── voice_service.py
+│   │       ├── business_service.py
+│   │       ├── state_service.py
+│   │       └── admin_service.py
+│   │
+│   ├── model_runtime/
+│   │   ├── clients/
+│   │   │   ├── llm_client.py
+│   │   │   ├── embedding_client.py
+│   │   │   ├── reranker_client.py
+│   │   │   ├── speech_to_text_client.py
+│   │   │   └── text_to_speech_client.py
+│   │   │
+│   │   ├── providers/
+│   │   │   ├── ollama_provider.py
+│   │   │   ├── claude_provider.py
+│   │   │   ├── openai_provider.py
+│   │   │   ├── sentence_transformer_provider.py
+│   │   │   ├── cross_encoder_provider.py
+│   │   │   ├── whisper_provider.py
+│   │   │   └── elevenlabs_provider.py
+│   │   │
+│   │   ├── prompts/
+│   │   │   ├── system_prompt.md
+│   │   │   ├── chat_prompt.md
+│   │   │   ├── memory_prompt.md
+│   │   │   ├── import_summary_prompt.md
+│   │   │   ├── roleplay_prompt.md
+│   │   │   └── templates/
+│   │   │       ├── context_block.md
+│   │   │       ├── memory_block.md
+│   │   │       ├── conversation_history_block.md
+│   │   │       ├── sheets_context_block.md
+│   │   │       ├── web_results_block.md
+│   │   │       └── document_generation_block.md
+│   │   │
+│   │   ├── prompt_building/
+│   │   │   ├── prompt_builder.py
+│   │   │   ├── system_prompt_builder.py
+│   │   │   ├── context_prompt_builder.py
+│   │   │   ├── document_prompt_builder.py
+│   │   │   └── roleplay_prompt_builder.py
+│   │   │
+│   │   ├── streaming/
+│   │   │   ├── stream_parser.py
+│   │   │   ├── stream_formatter.py
+│   │   │   └── stream_errors.py
+│   │   │
+│   │   └── safety/
+│   │       ├── output_cleaner.py
+│   │       ├── prompt_limits.py
+│   │       ├── token_counter.py
+│   │       └── response_sanitiser.py
+│   │
+│   ├── context/
+│   │   ├── context_builder.py
+│   │   ├── context_result.py
+│   │   ├── context_policy.py
+│   │   ├── context_logging.py
+│   │   ├── profile_context.py
+│   │   ├── memory_context.py
+│   │   ├── conversation_context.py
+│   │   ├── sheets_context.py
+│   │   └── web_context.py
+│   │
+│   ├── memory/
+│   │   ├── collections/
+│   │   │   ├── chroma_client.py
+│   │   │   ├── collection_registry.py
+│   │   │   ├── knowledge_collection.py
+│   │   │   ├── facts_collection.py
+│   │   │   ├── style_collection.py
+│   │   │   ├── documents_collection.py
+│   │   │   └── summaries_collection.py
+│   │   │
+│   │   ├── ingestion/
+│   │   │   ├── exchange_ingestor.py
+│   │   │   ├── document_ingestor.py
+│   │   │   ├── explicit_memory_ingestor.py
+│   │   │   ├── summary_ingestor.py
+│   │   │   └── ingest_policy.py
+│   │   │
+│   │   ├── retrieval/
+│   │   │   ├── semantic_search.py
+│   │   │   ├── keyword_search.py
+│   │   │   ├── hybrid_search.py
+│   │   │   ├── query_expansion.py
+│   │   │   ├── reranking.py
+│   │   │   ├── filtering.py
+│   │   │   └── scoring.py
+│   │   │
+│   │   ├── processing/
+│   │   │   ├── chunking.py
+│   │   │   ├── classification.py
+│   │   │   ├── deduplication.py
+│   │   │   ├── summarisation.py
+│   │   │   ├── tagging.py
+│   │   │   ├── metadata_builder.py
+│   │   │   └── quality_filter.py
+│   │   │
+│   │   ├── commands/
+│   │   │   ├── detect_memory_command.py
+│   │   │   ├── remember.py
+│   │   │   ├── forget.py
+│   │   │   └── command_result.py
+│   │   │
+│   │   └── inspection/
+│   │       ├── memory_stats.py
+│   │       ├── memory_search.py
+│   │       ├── memory_dump.py
+│   │       ├── memory_delete.py
+│   │       ├── summary_inspection.py
+│   │       └── recall_debugger.py
+│   │
+│   ├── ingestion/
+│   │   ├── sources/
+│   │   │   ├── chatgpt_source.py
+│   │   │   ├── grok_source.py
+│   │   │   ├── json_source.py
+│   │   │   ├── markdown_source.py
+│   │   │   ├── text_source.py
+│   │   │   ├── pdf_source.py
+│   │   │   └── docx_source.py
+│   │   │
+│   │   ├── parsing/
+│   │   │   ├── conversation_parser.py
+│   │   │   ├── chatgpt_parser.py
+│   │   │   ├── grok_parser.py
+│   │   │   ├── document_parser.py
+│   │   │   ├── metadata_parser.py
+│   │   │   └── parse_errors.py
+│   │   │
+│   │   ├── cleaning/
+│   │   │   ├── text_cleaner.py
+│   │   │   ├── duplicate_cleaner.py
+│   │   │   ├── noise_filter.py
+│   │   │   ├── pii_filter.py
+│   │   │   └── normaliser.py
+│   │   │
+│   │   ├── pipelines/
+│   │   │   ├── import_pipeline.py
+│   │   │   ├── conversation_pipeline.py
+│   │   │   ├── classification_pipeline.py
+│   │   │   ├── summary_pipeline.py
+│   │   │   ├── embedding_pipeline.py
+│   │   │   └── rebuild_pipeline.py
+│   │   │
+│   │   └── status/
+│   │       ├── import_status.py
+│   │       ├── import_job.py
+│   │       ├── import_report.py
+│   │       └── import_errors.py
+│   │
+│   ├── storage/
+│   │   ├── sqlite/
+│   │   │   ├── connection.py
+│   │   │   ├── migrations.py
+│   │   │   ├── schema.py
+│   │   │   └── repositories/
+│   │   │       ├── conversation_repository.py
+│   │   │       ├── message_repository.py
+│   │   │       ├── document_repository.py
+│   │   │       ├── roleplay_repository.py
+│   │   │       ├── state_repository.py
+│   │   │       ├── import_repository.py
+│   │   │       ├── error_repository.py
+│   │   │       └── settings_repository.py
+│   │   │
+│   │   ├── files/
+│   │   │   ├── file_paths.py
+│   │   │   ├── upload_store.py
+│   │   │   ├── generated_doc_store.py
+│   │   │   ├── audio_store.py
+│   │   │   ├── import_store.py
+│   │   │   ├── cache_store.py
+│   │   │   └── cleanup.py
+│   │   │
+│   │   └── runtime/
+│   │       ├── app_state.py
+│   │       ├── token_store.py
+│   │       ├── download_token_store.py
+│   │       └── session_store.py
+│   │
+│   ├── state/
+│   │   ├── profile/
+│   │   │   ├── profile_reader.py
+│   │   │   ├── profile_writer.py
+│   │   │   ├── profile_validator.py
+│   │   │   ├── field_meta.py
+│   │   │   └── stale_checks.py
+│   │   │
+│   │   ├── projects/
+│   │   │   ├── project_reader.py
+│   │   │   ├── project_writer.py
+│   │   │   ├── task_writer.py
+│   │   │   ├── decision_writer.py
+│   │   │   └── blocker_writer.py
+│   │   │
+│   │   └── daily/
+│   │       ├── daily_state_reader.py
+│   │       └── daily_state_writer.py
+│   │
+│   ├── documents/
+│   │   ├── extraction/
+│   │   │   ├── pdf_extractor.py
+│   │   │   ├── text_extractor.py
+│   │   │   └── markdown_extractor.py
+│   │   │
+│   │   ├── generation/
+│   │   │   ├── docx_generator.py
+│   │   │   ├── markdown_parser.py
+│   │   │   ├── inline_formatting.py
+│   │   │   └── document_styles.py
+│   │   │
+│   │   └── lifecycle/
+│   │       ├── document_records.py
+│   │       ├── document_delete.py
+│   │       ├── download_tokens.py
+│   │       └── cleanup_scheduler.py
+│   │
+│   ├── audio/
+│   │   ├── capture/
+│   │   │   ├── upload_normaliser.py
+│   │   │   ├── temp_audio.py
+│   │   │   └── audio_validation.py
+│   │   │
+│   │   ├── transcription/
+│   │   │   ├── transcribe_audio.py
+│   │   │   └── transcription_errors.py
+│   │   │
+│   │   └── speech/
+│   │       ├── prepare_tts.py
+│   │       ├── tts_chunks.py
+│   │       ├── speech_response.py
+│   │       └── speech_errors.py
+│   │
+│   ├── web/
+│   │   ├── search/
+│   │   │   ├── search_decision.py
+│   │   │   ├── ddgs_search.py
+│   │   │   ├── result_formatter.py
+│   │   │   └── search_errors.py
+│   │   │
+│   │   └── scraping/
+│   │       ├── scrape_detector.py
+│   │       ├── page_fetcher.py
+│   │       ├── html_text_extractor.py
+│   │       ├── metadata_extractor.py
+│   │       ├── review_prompt.py
+│   │       └── scrape_errors.py
+│   │
+│   ├── integrations/
+│   │   ├── google/
+│   │   │   ├── auth.py
+│   │   │   ├── sheets_client.py
+│   │   │   └── credentials.py
+│   │   │
+│   │   ├── sheets/
+│   │   │   ├── ingredients_reader.py
+│   │   │   ├── recipes_reader.py
+│   │   │   ├── prices_reader.py
+│   │   │   ├── menu_context.py
+│   │   │   └── cross_reference.py
+│   │   │
+│   │   └── shopify/
+│   │       ├── auth.py
+│   │       ├── client.py
+│   │       ├── product_payloads.py
+│   │       ├── meal_products.py
+│   │       └── token_cache.py
+│   │
+│   ├── business_logic/
+│   │   ├── property/
+│   │   │   ├── deal_parser.py
+│   │   │   ├── deal_calculator.py
+│   │   │   ├── sdlt.py
+│   │   │   └── deal_report.py
+│   │   │
+│   │   ├── meal_prep/
+│   │   │   ├── macro_calculator.py
+│   │   │   ├── meal_lookup.py
+│   │   │   ├── meal_normaliser.py
+│   │   │   └── shopify_meal_builder.py
+│   │   │
+│   │   └── roleplay/
+│   │       ├── roleplay_state.py
+│   │       ├── roleplay_runner.py
+│   │       ├── roleplay_detection.py
+│   │       └── prompts.py
+│   │
+│   ├── observability/
+│   │   ├── logging_config.py
+│   │   ├── logger.py
+│   │   ├── log_events.py
+│   │   ├── log_context.py
+│   │   ├── request_logging.py
+│   │   ├── error_reporter.py
+│   │   ├── exception_handlers.py
+│   │   ├── startup_validator.py
+│   │   ├── health_checks.py
+│   │   ├── metrics.py
+│   │   └── traces.py
+│   │
+│   ├── security/
+│   │   ├── admin_auth.py
+│   │   ├── api_keys.py
+│   │   ├── secrets.py
+│   │   ├── permissions.py
+│   │   ├── input_validation.py
+│   │   ├── sanitisation.py
+│   │   └── audit.py
+│   │
+│   ├── inspection/
+│   │   ├── admin_stats.py
+│   │   ├── recent_memory.py
+│   │   ├── semantic_search.py
+│   │   ├── summaries.py
+│   │   ├── collection_counts.py
+│   │   ├── raw_debug_dump.py
+│   │   ├── log_reader.py
+│   │   └── system_status.py
+│   │
+│   ├── scripts/
+│   │   ├── inspect_memory.py
+│   │   ├── inspect_logs.py
+│   │   ├── inspect_errors.py
+│   │   ├── rebuild_embeddings.py
+│   │   ├── import_chatgpt.py
+│   │   ├── generate_summaries.py
+│   │   ├── write_classifications.py
+│   │   ├── reset_db.py
+│   │   └── debug_summary.py
+│   │
+│   ├── tests/
+│   │   ├── unit/
+│   │   ├── integration/
+│   │   ├── e2e/
+│   │   └── fixtures/
+│   │
+│   └── data/
+│       ├── sqlite/
+│       │   ├── conversations.db
+│       │   └── lucchese_state.db
+│       │
+│       ├── chroma/
+│       │   └── chroma.sqlite3
+│       │
+│       ├── imports/
+│       │   ├── chatgpt/
+│       │   ├── grok/
+│       │   ├── raw/
+│       │   └── processed/
+│       │
+│       ├── generated_docs/
+│       ├── uploads/
+│       ├── audio/
+│       ├── cache/
+│       ├── temp/
+│       └── logs/
+│           ├── app.log
+│           ├── api.log
+│           ├── chat.log
+│           ├── memory.log
+│           ├── ingestion.log
+│           ├── model_runtime.log
+│           ├── integrations.log
+│           ├── startup.log
+│           ├── frontend.log
+│           └── errors.log
+│
+└── frontend/
+    ├── package.json
+    ├── package-lock.json
+    ├── vite.config.js
+    ├── index.html
+    │
+    └── src/
+        ├── main.jsx
+        │
+        ├── app/
+        │   ├── App.jsx
+        │   ├── routes.jsx
+        │   ├── providers.jsx
+        │   └── appConfig.js
+        │
+        ├── api/
+        │   ├── client.js
+        │   ├── chatApi.js
+        │   ├── conversationApi.js
+        │   ├── memoryApi.js
+        │   ├── documentApi.js
+        │   ├── uploadApi.js
+        │   ├── voiceApi.js
+        │   ├── adminApi.js
+        │   ├── logsApi.js
+        │   └── settingsApi.js
+        │
+        ├── interface/
+        │   ├── pages/
+        │   │   ├── HomePage.jsx
+        │   │   ├── ChatPage.jsx
+        │   │   ├── ConversationsPage.jsx
+        │   │   ├── MemoryPage.jsx
+        │   │   ├── DocumentsPage.jsx
+        │   │   ├── VoicePage.jsx
+        │   │   ├── AdminPage.jsx
+        │   │   ├── LogsPage.jsx
+        │   │   ├── DebugPage.jsx
+        │   │   └── SettingsPage.jsx
+        │   │
+        │   ├── layout/
+        │   │   ├── AppShell.jsx
+        │   │   ├── Header.jsx
+        │   │   ├── Sidebar.jsx
+        │   │   ├── PageHeader.jsx
+        │   │   └── Navigation.jsx
+        │   │
+        │   ├── components/
+        │   │   ├── chat/
+        │   │   │   ├── ChatWindow.jsx
+        │   │   │   ├── MessageList.jsx
+        │   │   │   ├── MessageBubble.jsx
+        │   │   │   ├── MessageActions.jsx
+        │   │   │   ├── ChatInput.jsx
+        │   │   │   ├── StreamingMessage.jsx
+        │   │   │   └── DocumentMarker.jsx
+        │   │   │
+        │   │   ├── memory/
+        │   │   │   ├── MemoryList.jsx
+        │   │   │   ├── MemoryCard.jsx
+        │   │   │   ├── MemorySearch.jsx
+        │   │   │   ├── MemoryFilters.jsx
+        │   │   │   ├── CollectionCard.jsx
+        │   │   │   └── RecentMemory.jsx
+        │   │   │
+        │   │   ├── documents/
+        │   │   │   ├── DocumentList.jsx
+        │   │   │   ├── UploadPanel.jsx
+        │   │   │   ├── DownloadDocButton.jsx
+        │   │   │   └── GeneratedDocCard.jsx
+        │   │   │
+        │   │   ├── voice/
+        │   │   │   ├── VoiceOrb.jsx
+        │   │   │   ├── VoiceTranscript.jsx
+        │   │   │   ├── VoiceReply.jsx
+        │   │   │   └── VoiceError.jsx
+        │   │   │
+        │   │   ├── admin/
+        │   │   │   ├── AdminPanel.jsx
+        │   │   │   ├── AdminTabs.jsx
+        │   │   │   ├── AdminStats.jsx
+        │   │   │   ├── AdminSearch.jsx
+        │   │   │   ├── AdminSummaries.jsx
+        │   │   │   └── AdminDangerZone.jsx
+        │   │   │
+        │   │   ├── logs/
+        │   │   │   ├── LogViewer.jsx
+        │   │   │   ├── ErrorList.jsx
+        │   │   │   ├── ErrorCard.jsx
+        │   │   │   ├── LogFilters.jsx
+        │   │   │   └── TraceViewer.jsx
+        │   │   │
+        │   │   └── common/
+        │   │       ├── Button.jsx
+        │   │       ├── Card.jsx
+        │   │       ├── Modal.jsx
+        │   │       ├── Loader.jsx
+        │   │       ├── EmptyState.jsx
+        │   │       ├── ErrorMessage.jsx
+        │   │       ├── StatBar.jsx
+        │   │       ├── StatPill.jsx
+        │   │       └── Pill.jsx
+        │   │
+        │   └── styles/
+        │       ├── tokens.css
+        │       ├── base.css
+        │       ├── layout.css
+        │       ├── chat.css
+        │       ├── memory.css
+        │       ├── documents.css
+        │       ├── voice.css
+        │       ├── admin.css
+        │       ├── logs.css
+        │       └── utilities.css
+        │
+        ├── state/
+        │   ├── stores/
+        │   │   ├── chatStore.js
+        │   │   ├── conversationStore.js
+        │   │   ├── memoryStore.js
+        │   │   ├── voiceStore.js
+        │   │   ├── adminStore.js
+        │   │   └── settingsStore.js
+        │   │
+        │   ├── context/
+        │   │   ├── ChatContext.jsx
+        │   │   ├── ConversationContext.jsx
+        │   │   ├── SettingsContext.jsx
+        │   │   └── ErrorContext.jsx
+        │   │
+        │   └── hooks/
+        │       ├── useChat.js
+        │       ├── useConversation.js
+        │       ├── useMemory.js
+        │       ├── useDocuments.js
+        │       ├── useVoice.js
+        │       ├── useAdmin.js
+        │       ├── useLogs.js
+        │       └── useSettings.js
+        │
+        ├── audio/
+        │   ├── recorder.js
+        │   ├── audioContext.js
+        │   ├── encodeWav.js
+        │   ├── playback.js
+        │   └── amplitude.js
+        │
+        ├── utils/
+        │   ├── dates.js
+        │   ├── errors.js
+        │   ├── formatMessage.js
+        │   ├── docMarker.js
+        │   ├── validation.js
+        │   └── storage.js
+        │
+        └── assets/
+            ├── icons/
+            ├── images/
+            └── fonts/

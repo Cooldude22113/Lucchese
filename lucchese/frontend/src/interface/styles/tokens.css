@@ -1,0 +1,15 @@
+/* Design tokens (Rule 19/20). CSS-variable form of the palette from Home.jsx.
+   The JS equivalents live in utils/theme.js for use inside inline style props. */
+
+:root {
+  --gold: #c8a96e;
+  --gold-dim: #8b6914;
+  --gold-light: #e8d5a3;
+  --bg: #0a0a0a;
+  --surface: #0f0f0f;
+  --border: #1e1e1e;
+  --text: #e8e0d0;
+  --text-dim: #555;
+  --ok: #4caf7d;
+  --danger: #e06c75;
+}

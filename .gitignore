@@ -1,0 +1,36 @@
+# ── Node / frontend (Vite) ───────────────────────────────
+node_modules/
+lucchese/frontend/dist/
+lucchese/frontend/build/
+.vite/
+*.local
+
+# npm / yarn / pnpm logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ── Environment / secrets ────────────────────────────────
+.env
+.env.*
+!.env.example
+credentials.json
+*.pem
+*.key
+
+# ── Python / backend ─────────────────────────────────────
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ── Editors / OS ─────────────────────────────────────────
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp

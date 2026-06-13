@@ -1,0 +1,6 @@
+/* Voice screen styles (Rule 19/20). Extracted from Voice.jsx's inline <style>. */
+
+@keyframes breathe {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}

@@ -1,0 +1,59 @@
+/* Global base styles (Rule 19/20). Extracted from the inline <style> blocks
+   that were duplicated across App.jsx, AdminPanel.jsx, Home.jsx and Voice.jsx. */
+
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap');
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: #0a0a0a;
+  color: #e8e0d0;
+  font-family: 'DM Sans', sans-serif;
+  min-height: 100vh;
+}
+
+::-webkit-scrollbar {
+  width: 3px;
+}
+::-webkit-scrollbar-thumb {
+  background: #222;
+  border-radius: 2px;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  outline: none;
+  background: none;
+}
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+input {
+  outline: none;
+  border: none;
+  background: transparent;
+  color: #e8e0d0;
+  font-family: 'DM Sans', sans-serif;
+}
+
+textarea {
+  resize: none;
+  outline: none;
+  border: none;
+  background: transparent;
+  color: #e8e0d0;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.95rem;
+  width: 100%;
+  line-height: 1.6;
+}
+textarea::placeholder {
+  color: #444;
+}

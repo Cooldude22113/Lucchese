@@ -1,0 +1,12 @@
+/* Home dashboard styles (Rule 19/20). Staggered fade-in helpers from Home.jsx. */
+
+@keyframes homeFadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-1 { animation: homeFadeUp 0.5s ease 0.1s both; }
+.fade-2 { animation: homeFadeUp 0.5s ease 0.2s both; }
+.fade-3 { animation: homeFadeUp 0.5s ease 0.3s both; }
+.fade-4 { animation: homeFadeUp 0.5s ease 0.4s both; }
+.fade-5 { animation: homeFadeUp 0.5s ease 0.5s both; }

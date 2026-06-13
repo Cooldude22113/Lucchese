@@ -1,0 +1,29 @@
+# Rule 24 — ignore runtime files in Git.
+# Commit code, docs, tests, config examples, and scripts. Never commit local DBs,
+# vector DBs, logs, generated docs, raw private imports, cache, temp, or secrets.
+
+# Runtime data root
+data/chroma/
+data/sqlite/*.db
+data/sqlite/*.db-wal
+data/sqlite/*.db-shm
+data/generated_docs/
+data/imports/raw/
+data/logs/
+data/audio/
+data/cache/
+data/temp/
+data/uploads/
+
+# Secrets
+.env
+credentials.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Keep the runtime dir structure in Git without their contents.
+!data/**/.gitkeep
