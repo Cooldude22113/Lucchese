@@ -29,12 +29,23 @@ AUDIO_DIR:          Path = DATA_DIR / "audio"
 CACHE_DIR:          Path = DATA_DIR / "cache"
 TEMP_DIR:           Path = DATA_DIR / "temp"
 
+# ── Imports (raw external exports → ingestion) ────────────────────────────────
+# Raw ChatGPT/Grok exports land in IMPORTS_RAW_DIR; once imported they may be
+# moved to IMPORTS_PROCESSED_DIR (see config/ingestion_settings.ARCHIVE_AFTER_IMPORT).
+IMPORTS_DIR:           Path = DATA_DIR / "imports"
+IMPORTS_RAW_DIR:       Path = IMPORTS_DIR / "raw"
+IMPORTS_PROCESSED_DIR: Path = IMPORTS_DIR / "processed"
+
 # ── Database files ────────────────────────────────────────────────────────────
 # Two distinct databases, kept distinct:
 #   conversations.db  — conversations, messages, documents, roleplay, errors
 #   lucchese_state.db — projects, tasks, decisions, blockers, daily/profile state
 CONVERSATIONS_DB: Path = SQLITE_DIR / "conversations.db"
 STATE_DB:         Path = SQLITE_DIR / "lucchese_state.db"
+# Canonical store for imported conversations (ChatGPT/Grok/Lucchese). Kept
+# separate from the live TEXT-id conversations.db so the integer-id canonical
+# tables do not collide; becomes the single conversation store at migration time.
+CONVERSATION_STORE_DB: Path = SQLITE_DIR / "conversation_store.db"
 
 # ── Vector store ──────────────────────────────────────────────────────────────
 # ChromaDB PersistentClient wants a string path.
@@ -61,5 +72,7 @@ def ensure_runtime_dirs() -> None:
         AUDIO_DIR,
         CACHE_DIR,
         TEMP_DIR,
+        IMPORTS_RAW_DIR,
+        IMPORTS_PROCESSED_DIR,
     ):
         directory.mkdir(parents=True, exist_ok=True)

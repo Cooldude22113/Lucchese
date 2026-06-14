@@ -424,6 +424,45 @@ def check_chromadb_connectivity(chroma_path: str) -> CheckResult:
     return r
 
 
+def check_ollama_connectivity() -> list[CheckResult]:
+    """Check 7 — Ollama connectivity, only when it is the active chat provider.
+
+    Skipped for non-ollama providers (Claude/OpenAI don't need a local daemon).
+    Unreachable ⇒ degraded start (chat will fail, but the server still boots). When
+    reachable, a configured model that is not pulled is surfaced as a warning — the
+    daemon is up but a call would 404 at inference time.
+    """
+    provider = os.getenv("CHAT_PROVIDER", "").strip().lower()
+    if provider != "ollama":
+        return [_skip("ollama.connectivity",
+                      f"CHAT_PROVIDER='{provider or 'unset'}' is not ollama")]
+
+    # Imported here (not at module top) to keep the provider import lazy.
+    from config.model_settings import MODEL_DEEP, MODEL_FAST
+    from model_runtime.providers.ollama_provider import check_availability
+
+    results: list[CheckResult] = []
+    reachable, models, detail = check_availability()
+
+    conn = CheckResult("ollama.connectivity",
+                       "ok" if reachable else "degraded",
+                       detail, "degraded_start")
+    _emit_check(conn)
+    results.append(conn)
+
+    if reachable:
+        missing = [m for m in {MODEL_FAST, MODEL_DEEP} if m and m not in models]
+        if missing:
+            warn = CheckResult("ollama.models", "warning",
+                               f"Configured model(s) not pulled: {sorted(missing)}. "
+                               f"Run `ollama pull <model>`. Available: {sorted(models)}.",
+                               "warning")
+            _emit_check(warn)
+            results.append(warn)
+
+    return results
+
+
 # ── Orchestrator ──────────────────────────────────────────────────────────────
 
 def run_startup_validation() -> StartupValidationResult:
@@ -523,6 +562,11 @@ def run_startup_validation() -> StartupValidationResult:
 
     # 6. ChromaDB connectivity
     all_checks.append(check_chromadb_connectivity(_CHROMA_PATH))
+
+    # 7. Ollama connectivity (only when it is the active chat provider)
+    ollama_checks = check_ollama_connectivity()
+    all_checks.extend(ollama_checks)
+    checks_skipped += sum(1 for c in ollama_checks if c.status == "skipped")
 
     # Aggregate
     checks_run = len(all_checks) - checks_skipped

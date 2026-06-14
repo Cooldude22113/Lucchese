@@ -1,0 +1,1049 @@
+Yes. Start with **Lucchese Agent Team v0.1**: a local coordination system where agents produce structured plans, reviews, reports, and interpretations, but **do not touch your code automatically yet**.
+
+That is the sane version. Horrifying that “sane” now means “a council of tiny artificial managers,” but here we are.
+
+## Goal for v0.1
+
+You want Lucchese to do this:
+
+```text
+Alex gives a mission
+    ↓
+Lucchese creates a mission brief
+    ↓
+Lucchese runs selected agents
+    ↓
+Each agent writes a structured report
+    ↓
+Lucchese combines everything into one decision packet
+    ↓
+Alex decides what to implement
+    ↓
+Lucchese saves a report/changelog
+```
+
+No autonomous coding yet. No file editing yet. No fake “I fixed it” nonsense.
+
+---
+
+# 1. Create this folder structure
+
+Put this near your backend, probably next to `lucchese_api.py`.
+
+```text
+lucchese/
+  agents/
+    __init__.py
+    schemas.py
+    registry.py
+    prompt_loader.py
+    llm_client.py
+    orchestrator.py
+
+    prompts/
+      project_manager.md
+      technical_architect.md
+      implementation_planner.md
+      qa_reviewer.md
+      changelog_auditor.md
+      interpreter.md
+      memory_curator.md
+
+  missions/
+  reports/
+```
+
+If your project has a backend folder, use:
+
+```text
+backend/
+  agents/
+  missions/
+  reports/
+```
+
+The exact folder location matters less than consistency. Revolutionary concept, apparently.
+
+---
+
+# 2. `agents/registry.py`
+
+This defines your team.
+
+```python
+# agents/registry.py
+
+AGENT_REGISTRY = {
+    "project_manager": {
+        "name": "Project Manager",
+        "role": "Break goals into clear tasks, priorities, and blockers.",
+        "can_modify_code": False,
+        "output_type": "project_plan",
+        "permission_level": 1,
+    },
+    "technical_architect": {
+        "name": "Technical Architect",
+        "role": "Review structure, file placement, interfaces, and long-term maintainability.",
+        "can_modify_code": False,
+        "output_type": "architecture_report",
+        "permission_level": 1,
+    },
+    "implementation_planner": {
+        "name": "Implementation Planner",
+        "role": "Suggest exact code changes, diffs, and implementation steps without applying them.",
+        "can_modify_code": False,
+        "output_type": "implementation_plan",
+        "permission_level": 2,
+    },
+    "qa_reviewer": {
+        "name": "QA Reviewer",
+        "role": "Review proposed changes for bugs, missing tests, risks, and edge cases.",
+        "can_modify_code": False,
+        "output_type": "qa_report",
+        "permission_level": 1,
+    },
+    "changelog_auditor": {
+        "name": "Changelog Auditor",
+        "role": "Create precise changelog and report entries from actual or proposed work.",
+        "can_modify_code": False,
+        "output_type": "change_report",
+        "permission_level": 1,
+    },
+    "interpreter": {
+        "name": "Interpreter",
+        "role": "Explain what happened, why it matters, and what Alex should understand.",
+        "can_modify_code": False,
+        "output_type": "interpretation",
+        "permission_level": 0,
+    },
+    "memory_curator": {
+        "name": "Memory Curator",
+        "role": "Decide what should be saved into long-term project memory or context files.",
+        "can_modify_code": False,
+        "output_type": "memory_recommendation",
+        "permission_level": 1,
+    },
+}
+
+
+DEFAULT_AGENT_FLOW = [
+    "project_manager",
+    "technical_architect",
+    "implementation_planner",
+    "qa_reviewer",
+    "changelog_auditor",
+    "interpreter",
+    "memory_curator",
+]
+
+
+def get_agent(agent_key: str) -> dict:
+    if agent_key not in AGENT_REGISTRY:
+        raise ValueError(f"Unknown agent: {agent_key}")
+
+    return AGENT_REGISTRY[agent_key]
+
+
+def select_agents(user_request: str, mode: str = "default") -> list[str]:
+    """
+    Basic agent selection for v0.1.
+    Later this can become smarter.
+    """
+
+    request = user_request.lower()
+
+    if mode == "review":
+        return [
+            "technical_architect",
+            "qa_reviewer",
+            "changelog_auditor",
+            "interpreter",
+        ]
+
+    if "changelog" in request or "report" in request:
+        return [
+            "changelog_auditor",
+            "interpreter",
+            "memory_curator",
+        ]
+
+    if "architecture" in request or "structure" in request or "refactor" in request:
+        return [
+            "project_manager",
+            "technical_architect",
+            "implementation_planner",
+            "qa_reviewer",
+            "interpreter",
+        ]
+
+    return DEFAULT_AGENT_FLOW
+```
+
+---
+
+# 3. `agents/schemas.py`
+
+This gives the system a shared structure.
+
+```python
+# agents/schemas.py
+
+from datetime import datetime
+from typing import Any, Optional
+from pydantic import BaseModel, Field
+
+
+class MissionRequest(BaseModel):
+    user_request: str
+    project_context: str = ""
+    mode: str = "default"
+    require_code_proposal: bool = False
+
+
+class Mission(BaseModel):
+    mission_id: str
+    title: str
+    user_request: str
+    project_context: str = ""
+    mode: str = "default"
+    status: str = "created"
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    selected_agents: list[str] = Field(default_factory=list)
+
+
+class AgentReport(BaseModel):
+    mission_id: str
+    agent_key: str
+    agent_name: str
+    output_type: str
+    report: str
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+
+class DecisionPacket(BaseModel):
+    mission_id: str
+    title: str
+    user_request: str
+    selected_agents: list[str]
+    agent_reports: list[AgentReport]
+    final_summary: str
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+```
+
+---
+
+# 4. `agents/prompt_loader.py`
+
+Simple prompt loading.
+
+```python
+# agents/prompt_loader.py
+
+from pathlib import Path
+
+
+PROMPT_DIR = Path(__file__).parent / "prompts"
+
+
+def load_prompt(agent_key: str) -> str:
+    prompt_path = PROMPT_DIR / f"{agent_key}.md"
+
+    if not prompt_path.exists():
+        raise FileNotFoundError(f"Missing prompt file: {prompt_path}")
+
+    return prompt_path.read_text(encoding="utf-8")
+```
+
+---
+
+# 5. `agents/llm_client.py`
+
+This assumes you are using Ollama locally.
+
+```python
+# agents/llm_client.py
+
+import os
+import requests
+
+
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+OLLAMA_MODEL = os.getenv("LUCHESE_AGENT_MODEL", "llama3.1")
+
+
+def run_llm(prompt: str, model: str | None = None) -> str:
+    """
+    Sends a prompt to the local Ollama model.
+    """
+
+    selected_model = model or OLLAMA_MODEL
+
+    payload = {
+        "model": selected_model,
+        "prompt": prompt,
+        "stream": False,
+    }
+
+    try:
+        response = requests.post(
+            f"{OLLAMA_HOST}/api/generate",
+            json=payload,
+            timeout=180,
+        )
+        response.raise_for_status()
+        data = response.json()
+        return data.get("response", "").strip()
+
+    except requests.RequestException as error:
+        return (
+            "LLM_ERROR:\n"
+            f"Could not reach local model at {OLLAMA_HOST}.\n"
+            f"Model: {selected_model}\n"
+            f"Error: {error}"
+        )
+```
+
+In your `.env`, add:
+
+```env
+LUCHESE_AGENT_MODEL=llama3.1
+OLLAMA_HOST=http://localhost:11434
+```
+
+Use whatever model you actually have installed. Do not invent one because the internet told you it has “agentic reasoning.” Most of those claims are marketing foam.
+
+---
+
+# 6. `agents/orchestrator.py`
+
+This is the heart of coordination.
+
+```python
+# agents/orchestrator.py
+
+import json
+from datetime import datetime
+from pathlib import Path
+
+from agents.registry import get_agent, select_agents
+from agents.prompt_loader import load_prompt
+from agents.llm_client import run_llm
+from agents.schemas import MissionRequest, Mission, AgentReport, DecisionPacket
+
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+MISSIONS_DIR = BASE_DIR / "missions"
+REPORTS_DIR = BASE_DIR / "reports"
+
+MISSIONS_DIR.mkdir(exist_ok=True)
+REPORTS_DIR.mkdir(exist_ok=True)
+
+
+def create_mission_title(user_request: str) -> str:
+    clean = user_request.strip().replace("\n", " ")
+    return clean[:80] if clean else "Untitled Mission"
+
+
+def create_mission_id() -> str:
+    return f"mission_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+
+def build_agent_prompt(
+    agent_key: str,
+    mission: Mission,
+    previous_reports: list[AgentReport],
+) -> str:
+    agent = get_agent(agent_key)
+    base_prompt = load_prompt(agent_key)
+
+    previous_report_text = "\n\n".join(
+        [
+            f"## Previous Report: {report.agent_name}\n{report.report}"
+            for report in previous_reports
+        ]
+    )
+
+    return f"""
+{base_prompt}
+
+# Mission
+
+Mission ID: {mission.mission_id}
+Mission Title: {mission.title}
+
+# User Request
+
+{mission.user_request}
+
+# Project Context
+
+{mission.project_context or "No additional project context provided."}
+
+# Previous Agent Reports
+
+{previous_report_text or "No previous reports yet."}
+
+# Your Agent Identity
+
+Agent Key: {agent_key}
+Agent Name: {agent["name"]}
+Agent Role: {agent["role"]}
+Output Type: {agent["output_type"]}
+Can Modify Code: {agent["can_modify_code"]}
+Permission Level: {agent["permission_level"]}
+
+# Rules
+
+- Do not claim code has been changed unless actual file changes are provided.
+- Do not claim tests passed unless test results are provided.
+- Be specific.
+- Include file names when relevant.
+- Mark uncertainty clearly.
+- Produce a structured markdown report.
+""".strip()
+
+
+def run_agent(
+    agent_key: str,
+    mission: Mission,
+    previous_reports: list[AgentReport],
+) -> AgentReport:
+    agent = get_agent(agent_key)
+
+    prompt = build_agent_prompt(
+        agent_key=agent_key,
+        mission=mission,
+        previous_reports=previous_reports,
+    )
+
+    output = run_llm(prompt)
+
+    return AgentReport(
+        mission_id=mission.mission_id,
+        agent_key=agent_key,
+        agent_name=agent["name"],
+        output_type=agent["output_type"],
+        report=output,
+    )
+
+
+def synthesize_decision_packet(
+    mission: Mission,
+    reports: list[AgentReport],
+) -> str:
+    report_text = "\n\n".join(
+        [
+            f"# {report.agent_name} Report\n\n{report.report}"
+            for report in reports
+        ]
+    )
+
+    synthesis_prompt = f"""
+You are Lucchese's Orchestrator.
+
+Your job is to combine the agent reports into one clear decision packet for Alex.
+
+# Mission
+
+{mission.title}
+
+# User Request
+
+{mission.user_request}
+
+# Agent Reports
+
+{report_text}
+
+# Output Required
+
+Create a final markdown decision packet with:
+
+1. Mission summary
+2. Recommended action
+3. Key decisions
+4. Proposed implementation steps
+5. Risks and blockers
+6. Testing needed
+7. Changelog summary
+8. Memory/context update recommendation
+9. Final status
+
+Be precise.
+Do not exaggerate.
+Do not claim implementation happened unless the reports prove it.
+""".strip()
+
+    return run_llm(synthesis_prompt)
+
+
+def save_json(path: Path, data: dict) -> None:
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def save_markdown_report(packet: DecisionPacket) -> Path:
+    report_path = REPORTS_DIR / f"{packet.mission_id}.md"
+
+    report_text = f"""# {packet.title}
+
+## Mission ID
+
+{packet.mission_id}
+
+## User Request
+
+{packet.user_request}
+
+## Selected Agents
+
+{", ".join(packet.selected_agents)}
+
+---
+
+# Final Decision Packet
+
+{packet.final_summary}
+
+---
+
+# Raw Agent Reports
+
+"""
+
+    for report in packet.agent_reports:
+        report_text += f"""
+## {report.agent_name}
+
+**Output Type:** {report.output_type}
+
+{report.report}
+
+---
+"""
+
+    report_path.write_text(report_text, encoding="utf-8")
+    return report_path
+
+
+def coordinate_mission(request: MissionRequest) -> DecisionPacket:
+    mission = Mission(
+        mission_id=create_mission_id(),
+        title=create_mission_title(request.user_request),
+        user_request=request.user_request,
+        project_context=request.project_context,
+        mode=request.mode,
+    )
+
+    selected_agents = select_agents(
+        user_request=request.user_request,
+        mode=request.mode,
+    )
+
+    mission.selected_agents = selected_agents
+    mission.status = "running"
+
+    mission_path = MISSIONS_DIR / f"{mission.mission_id}.json"
+    save_json(mission_path, mission.model_dump())
+
+    reports: list[AgentReport] = []
+
+    for agent_key in selected_agents:
+        report = run_agent(
+            agent_key=agent_key,
+            mission=mission,
+            previous_reports=reports,
+        )
+        reports.append(report)
+
+    final_summary = synthesize_decision_packet(
+        mission=mission,
+        reports=reports,
+    )
+
+    packet = DecisionPacket(
+        mission_id=mission.mission_id,
+        title=mission.title,
+        user_request=mission.user_request,
+        selected_agents=selected_agents,
+        agent_reports=reports,
+        final_summary=final_summary,
+    )
+
+    save_json(
+        REPORTS_DIR / f"{mission.mission_id}.json",
+        packet.model_dump(),
+    )
+
+    save_markdown_report(packet)
+
+    return packet
+```
+
+---
+
+# 7. Create the agent prompt files
+
+## `agents/prompts/project_manager.md`
+
+```md
+You are the Project Manager Agent for Lucchese.
+
+Your job is to turn Alex's request into clear, ordered work.
+
+You must return:
+
+# Project Manager Report
+
+## Goal
+State the user's goal in plain terms.
+
+## Tasks
+Break the work into clear steps.
+
+## Priority
+Explain what should happen first.
+
+## Blockers
+List anything that may prevent progress.
+
+## Definition of Done
+Explain what must be true before this mission can be considered complete.
+
+## Notes
+Mention anything Alex may be overlooking.
+```
+
+---
+
+## `agents/prompts/technical_architect.md`
+
+```md
+You are the Technical Architect Agent for Lucchese.
+
+Your job is to think about structure, architecture, and maintainability.
+
+You must return:
+
+# Technical Architect Report
+
+## Architecture Summary
+Explain the best structural approach.
+
+## Relevant Files or Areas
+List likely files, folders, modules, or systems involved.
+
+## Recommended Design
+Explain how this should be built or organized.
+
+## What Not To Do
+List risky or messy approaches to avoid.
+
+## Risks
+Mention possible technical problems.
+
+## Confidence
+High, medium, or low. Explain why.
+```
+
+---
+
+## `agents/prompts/implementation_planner.md`
+
+```md
+You are the Implementation Planner Agent for Lucchese.
+
+Your job is to propose exact implementation steps.
+
+You may suggest code, but you must not claim code has been applied.
+
+You must return:
+
+# Implementation Planner Report
+
+## Implementation Summary
+Briefly explain the proposed implementation.
+
+## Files To Create
+List any new files.
+
+## Files To Edit
+List any existing files.
+
+## Proposed Code or Diff
+Include code blocks or diffs if useful.
+
+## Step-by-Step Instructions
+Explain the order Alex should implement this in.
+
+## Validation
+Explain how to check whether the change works.
+
+## Status
+Mark this as PROPOSED, not implemented.
+```
+
+---
+
+## `agents/prompts/qa_reviewer.md`
+
+```md
+You are the QA Reviewer Agent for Lucchese.
+
+Your job is to review the mission and previous reports for bugs, missing checks, and weak assumptions.
+
+You must return:
+
+# QA Reviewer Report
+
+## Review Summary
+Summarize what you reviewed.
+
+## Issues Found
+List bugs, risks, missing details, or unclear assumptions.
+
+## Test Plan
+Give manual and automated tests where relevant.
+
+## Edge Cases
+List important edge cases.
+
+## Required Fixes
+List anything that should be fixed before implementation.
+
+## Approval Status
+Use one of:
+- APPROVED
+- APPROVED WITH WARNINGS
+- NOT APPROVED
+```
+
+---
+
+## `agents/prompts/changelog_auditor.md`
+
+```md
+You are the Changelog Auditor Agent for Lucchese.
+
+Your job is to produce an accurate report/changelog.
+
+You must not claim that files were changed unless actual changes are provided.
+
+You must return:
+
+# Changelog Auditor Report
+
+## Mission
+State the mission.
+
+## Change Type
+Use one:
+- Planning
+- Proposed implementation
+- Code change
+- Review
+- Refactor
+- Bug fix
+- Documentation
+
+## Files Affected
+List files that are confirmed or proposed.
+
+## Exact Changes
+Separate confirmed changes from proposed changes.
+
+## Tests Run
+State what tests were run. If none, say none.
+
+## Known Issues
+List unresolved issues.
+
+## Changelog Entry
+Write a concise changelog entry.
+
+## Completion Status
+Use one:
+- Planned
+- Proposed
+- Implemented
+- Tested
+- Blocked
+```
+
+---
+
+## `agents/prompts/interpreter.md`
+
+```md
+You are the Interpreter Agent for Lucchese.
+
+Your job is to explain what the mission means for Alex and the project.
+
+You must return:
+
+# Interpreter Report
+
+## Plain English Summary
+Explain what is happening simply.
+
+## Why This Matters
+Explain why this matters for Lucchese.
+
+## Decision Alex Needs To Make
+State the decision clearly.
+
+## What Alex Should Understand
+Explain the key lesson or insight.
+
+## Next Best Action
+Give one practical next action.
+```
+
+---
+
+## `agents/prompts/memory_curator.md`
+
+```md
+You are the Memory Curator Agent for Lucchese.
+
+Your job is to decide what should be saved into long-term project memory.
+
+You must return:
+
+# Memory Curator Report
+
+## Should This Be Saved?
+Yes or no.
+
+## Memory Candidate
+Write the exact memory/context note if one should be saved.
+
+## Context Files To Update
+Suggest files such as:
+- PROJECT_CONTEXT.md
+- DECISIONS.md
+- CHANGELOG.md
+- ROADMAP.md
+- KNOWN_ISSUES.md
+
+## Do Not Save
+List details that are temporary, noisy, or not useful.
+
+## Reasoning
+Explain why this should or should not become long-term context.
+```
+
+---
+
+# 8. Add a FastAPI route
+
+If your backend is in `lucchese_api.py`, add this carefully.
+
+```python
+from agents.schemas import MissionRequest
+from agents.orchestrator import coordinate_mission
+
+
+@app.post("/agents/coordinate")
+async def coordinate_agents(request: MissionRequest):
+    packet = coordinate_mission(request)
+    return packet.model_dump()
+```
+
+If you are using routers, better:
+
+```python
+# routes/agents.py
+
+from fastapi import APIRouter
+from agents.schemas import MissionRequest
+from agents.orchestrator import coordinate_mission
+
+router = APIRouter(prefix="/agents", tags=["agents"])
+
+
+@router.post("/coordinate")
+async def coordinate_agents(request: MissionRequest):
+    packet = coordinate_mission(request)
+    return packet.model_dump()
+```
+
+Then in your main API file:
+
+```python
+from routes.agents import router as agents_router
+
+app.include_router(agents_router)
+```
+
+---
+
+# 9. Test it with curl
+
+Run your backend, then test:
+
+```bash
+curl -X POST http://localhost:8000/agents/coordinate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_request": "Help me plan a memory recall visibility panel for the Lucchese frontend.",
+    "project_context": "Lucchese has a backend API in lucchese_api.py and a local React/Vite frontend. Current bottleneck is trust and frontend usability.",
+    "mode": "default",
+    "require_code_proposal": false
+  }'
+```
+
+Expected result:
+
+```text
+- mission created
+- agents selected
+- reports generated
+- decision packet returned
+- JSON report saved
+- markdown report saved
+```
+
+Then check:
+
+```text
+missions/
+reports/
+```
+
+If those files are created, the coordination system is alive. Slightly unsettling, but useful.
+
+---
+
+# 10. Add a frontend panel later
+
+For now, you can test through curl/Postman.
+
+But later, you can add a simple frontend page:
+
+```text
+/admin/agents
+```
+
+or:
+
+```text
+/lucchese/command
+```
+
+Basic UI:
+
+```text
+Mission input box
+Project context box
+Mode dropdown
+Run button
+Agent reports display
+Final decision packet display
+Saved report link
+```
+
+Do not build the whole UI first. Backend coordination first, frontend polish second. Otherwise you’ll start styling cards while the system underneath is still a shoebox full of wires.
+
+---
+
+# Recommended first mission to run
+
+Use this as your first real test:
+
+```text
+Set up Lucchese Agent Team v0.1 with an Orchestrator, Project Manager, Technical Architect, Implementation Planner, QA Reviewer, Changelog Auditor, Interpreter, and Memory Curator. The system should produce structured reports only and should not modify code automatically.
+```
+
+Project context:
+
+```text
+Lucchese is a local AI assistant project. Current focus is improving trust, frontend usability, memory recall visibility, and project organisation. Alex wants to stay in control of implementation while agents help with planning, reviewing, reporting, and interpretation.
+```
+
+That should generate a decent first report.
+
+---
+
+# Neutral view
+
+This setup gives Lucchese a proper coordination layer without overcommitting to autonomous coding. It is modular, understandable, and easy to extend later.
+
+The main tradeoff is that it adds structure before adding raw capability. That is not bad, but it does mean you need to actually use the reports instead of letting them become decorative bureaucracy. The machines are already smug enough.
+
+---
+
+# Devil’s advocate view
+
+The danger is overbuilding the agent system and avoiding the actual Lucchese frontend/backend work. This setup should stay lean.
+
+For now, do **not** add:
+
+```text
+- autonomous file editing
+- git commits
+- complex multi-agent debate
+- agent-to-agent chat
+- permanent memory writes without review
+- background task queues
+```
+
+That can come later.
+
+The only v0.1 job is:
+
+```text
+Mission in.
+Reports out.
+Decision packet saved.
+```
+
+Anything beyond that is probably procrastination wearing a lab coat.
+
+---
+
+# Positive view
+
+This is a strong move because it directly fixes your current Lucchese problem: **trust**.
+
+Instead of Lucchese just answering, it will show:
+
+```text
+- who looked at the task
+- what each agent thought
+- what was proposed
+- what was risky
+- what should be saved
+- what the final recommendation is
+```
+
+That makes Lucchese feel less like a chatbot and more like a governed system you can actually build with.
+
+---
+
+# Build order
+
+Do it in this order:
+
+```text
+1. Create folders.
+2. Add registry.py.
+3. Add schemas.py.
+4. Add prompt_loader.py.
+5. Add llm_client.py.
+6. Add orchestrator.py.
+7. Add prompt markdown files.
+8. Add FastAPI route.
+9. Test with curl.
+10. Check reports folder.
+```
+
+Your first success condition is simple:
+
+```text
+You send one request.
+Lucchese runs multiple agent perspectives.
+A decision packet comes back.
+A markdown report gets saved.
+```
+
+That is Lucchese coordination v0.1. Not perfect, not magical, but real enough to start governing.

@@ -16,7 +16,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ── LLM providers ─────────────────────────────────────────────────────────────
-OLLAMA_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434") + "/api/chat"
+# Base URL is its own constant so connectivity probes can build other endpoints
+# (e.g. /api/tags) without re-deriving it. OLLAMA_URL keeps its previous value.
+OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_URL: str = OLLAMA_BASE_URL + "/api/chat"
 MODEL_FAST: str = os.getenv("MODEL_FAST", "gemma2:27b")
 MODEL_DEEP: str = os.getenv("MODEL_DEEP", "qwen2.5:32b")
 

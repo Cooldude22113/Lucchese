@@ -8,6 +8,8 @@ Thin admin endpoints (Rule 2), all protected by the X-Admin-Key header (Rule 16)
   DELETE /admin/memory     — delete all entries from a given source
   POST   /admin/summarise  — collapse memory into per-category summaries
   GET    /admin/summaries  — list generated summaries
+  POST   /admin/import     — import raw ChatGPT/Grok exports into the conversation store
+  GET    /admin/import/status — current store counts + recent import runs
 """
 
 from __future__ import annotations
@@ -15,6 +17,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 
 from application.orchestration.admin_flow import run_summarise
+from application.orchestration.import_flow import run_import_flow
+from application.services.import_service import import_status
 from inspection.admin_stats import admin_stats
 from inspection.recent_memory import recent_facts
 from inspection.semantic_search import search_facts
@@ -58,3 +62,19 @@ async def summarise(admin_key: str = Depends(verify_admin_key)):
 @router.get("/admin/summaries")
 def summaries(admin_key: str = Depends(verify_admin_key)):
     return list_summaries()
+
+
+@router.post("/admin/import")
+async def run_import(
+    source: str = "all",
+    dry_run: bool = False,
+    admin_key: str = Depends(verify_admin_key),
+):
+    if source not in ("all", "chatgpt", "grok"):
+        raise HTTPException(400, "source must be one of: all, chatgpt, grok")
+    return await run_import_flow(source=source, dry_run=dry_run)
+
+
+@router.get("/admin/import/status")
+def import_run_status(admin_key: str = Depends(verify_admin_key)):
+    return import_status()

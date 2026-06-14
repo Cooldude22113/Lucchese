@@ -6,6 +6,9 @@ Exposes two coroutines:
   - complete(messages, model, options)  -> full reply string (stream=False)
   - stream(messages, model)             -> async generator of raw NDJSON lines
 
+plus one synchronous connectivity probe:
+  - check_availability()                -> (reachable, model_names, detail)
+
 Higher layers (llm_client) decide which to call; NDJSON line parsing lives in
 model_runtime/streaming/stream_parser.py.
 """
@@ -16,7 +19,27 @@ from collections.abc import AsyncIterator
 
 import httpx
 
-from config.model_settings import OLLAMA_URL, LLM_TIMEOUT
+from config.model_settings import OLLAMA_BASE_URL, OLLAMA_URL, LLM_TIMEOUT
+
+
+def check_availability(timeout: float = 5.0) -> tuple[bool, list[str], str]:
+    """
+    Lightweight, synchronous Ollama connectivity probe.
+
+    GETs {OLLAMA_BASE_URL}/api/tags and returns (reachable, model_names, detail).
+    Used by observability (startup validation and /health). Never raises: any
+    failure is reported as (False, [], detail) so callers degrade gracefully.
+    httpx's own timeout guards against a hung daemon, so no thread wrapper is
+    needed.
+    """
+    url = f"{OLLAMA_BASE_URL}/api/tags"
+    try:
+        res = httpx.get(url, timeout=timeout)
+        res.raise_for_status()
+        models = [m["name"] for m in res.json().get("models", []) if "name" in m]
+        return True, models, f"Ollama reachable at {OLLAMA_BASE_URL} ({len(models)} models)."
+    except Exception as exc:
+        return False, [], f"Ollama unreachable at {OLLAMA_BASE_URL}: {exc}"
 
 
 async def complete(

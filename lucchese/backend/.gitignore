@@ -9,6 +9,7 @@ data/sqlite/*.db-wal
 data/sqlite/*.db-shm
 data/generated_docs/
 data/imports/raw/
+data/imports/processed/
 data/logs/
 data/audio/
 data/cache/
